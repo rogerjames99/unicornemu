@@ -74,10 +74,10 @@ class SocketThread(threading.Thread):
         yscale = float(self.surface.get_height()) / self.hatSize
         self.context.scale(xscale, yscale)
         # Put some random colours in
-        for i in range(self.hatSize):
-            for j in range(self.hatSize):
+        for y in range(self.hatSize):
+            for x in range(self.hatSize):
                 self.context.set_source_rgba(random.random(), random.random(), random.random())
-                self.context.rectangle(i, j, 1, 1)
+                self.context.rectangle(x, y, 1, 1)
                 self.context.fill()
                 
         # dirty the drawingArea
@@ -106,7 +106,7 @@ class SocketThread(threading.Thread):
             while not self.stop_event.isSet():
                 try:
                     data = self.socket.recv(4)
-                    if data.length() < 4:
+                    if len(data) < 4:
                         logging.debug('RSP message < 4 bytes received - the reomte end has probably gone away')
                         socket.close()
                         break
@@ -140,7 +140,7 @@ class SocketThread(threading.Thread):
                     elif command == 'alloff':
                         self.alloff()
                     elif command == 'sweep':
-                        logging.debug('sweep')
+                        self.sweep()
                     elif command.startswith('red'):
                         logging.debug('red')
                     elif command.startswith('green'):
@@ -179,6 +179,17 @@ class SocketThread(threading.Thread):
         self.context.set_source_rgb(0, 0, 0)
         self.context.paint()
         self.drawingArea.queue_draw()
+        
+    def sweep(self):
+        logging.debug('sweep')
+        for y in range(self.hatSize):
+            for x in range(self.hatSize):
+                self.context.set_source_rgba(random.random(), random.random(), random.random())
+                self.context.rectangle(x, y, 1, 1)
+                self.context.fill()
+                self.drawingArea.queue_draw()
+                time.sleep(0.05)
+
 
     def terminate(self):
         logging.debug('Terminating scratch thread')

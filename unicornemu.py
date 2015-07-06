@@ -68,11 +68,15 @@ class SocketThread(threading.Thread):
         self.context = cairo.Context(self.surface)
         self.drawingArea = drawingArea
         self.hatSize = 8
+        self.tcolours = {'r': (1, 0, 0), 'red': (1, 0, 0), 'g': (0, 1, 0), 'green': (0, 1, 0), 'b': (0, 0, 1), 'blue': (0, 0, 1),
+                    'c': (0, 1, 1), 'cyan': (0, 1, 1), 'm': (1, 0, 1), 'magenta': (1, 0, 1), 'y': (1, 1, 0), 'yellow': (1, 1, 0),
+                    'w': (1, 1, 1), 'white': (1, 1, 1), '0': (0, 0, 0), 'off': (0, 0, 0), '1': (1, 1, 1), 'on': (1, 1, 1),
+                    'z': (0, 0, 0), 'invert': (0, 0, 0), 'random' : (0,0,0)}
+        self.lastColour = 'off'
+
         
        
-        xscale = float(self.surface.get_width()) / self.hatSize
-        yscale = float(self.surface.get_height()) / self.hatSize
-        self.context.scale(xscale, yscale)
+        self.context.scale(float(self.surface.get_width()) / self.hatSize, float(self.surface.get_height()) / self.hatSize)
         # Put some random colours in
         for y in range(self.hatSize):
             for x in range(self.hatSize):
@@ -101,7 +105,7 @@ class SocketThread(threading.Thread):
                 time.sleep(3)
                 continue
                 
-            self.socket.settimeout(5)
+            self.socket.settimeout(1)
                 
             while not self.stop_event.isSet():
                 try:
@@ -122,15 +126,15 @@ class SocketThread(threading.Thread):
                     socket.close()
                     break
                     
-                words = data.split(None,1)
+                words = data.split(' ',1)
                 
                 if words[0].lower() != 'broadcast':
                     logging.debug('Discarding message; not a broadcast')
                     continue
                     
                 broadcast_message = words[1][1:-1]
-                broadcast_message = broadcast_message.lower()                
-                commands = broadcast_message.split()
+                broadcast_message = broadcast_message.lower()
+                commands = broadcast_message.split(' ')
                 
                 for command in commands:
                     if command.startswith('matrixuse'):
@@ -150,13 +154,13 @@ class SocketThread(threading.Thread):
                     elif command.startswith('colour'):
                         logging.debug('colour')
                     elif command.startswith('pixel'):
-                        logging.debug('pixel')
+                        self.pixel(command[5:])
                     elif command.startswith('bright'):
                         logging.debug('bright')
                     elif command.startswith('matrixpattern'):
                         logging.debug('matrixpattern')
                     elif command.startswith('move'):
-                        logging.debug('move')
+                        self.move(command[4:])
                     elif command == 'invert':
                         logging.debug('invert')
                     elif command.startswith('level'):
@@ -189,14 +193,84 @@ class SocketThread(threading.Thread):
                 self.context.fill()
                 self.drawingArea.queue_draw()
                 time.sleep(0.05)
+    
+    def move(self, command):
+        logging.debug('move')
+        # Grab the current contents of the surface
+        pattern = cairo.SurfacePattern(self.surface)
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.surface.get_width(), self.surface.get_height())
+        context = cairo.Context(surface)
+        context.set_source(pattern)
+        context.paint()
+        pattern = cairo.SurfacePattern(surface)
+        # This needs cleaning up the scaling and translation matrices are done in the wrong order
+        if command.startswith('up'):
+            testmatrix = cairo.Matrix(x0=0, y0=1, xx=float(surface.get_width())/self.hatSize, yy=float(surface.get_height())/self.hatSize)
+            pattern.set_matrix(cairo.Matrix(x0=0, y0=1.0 * float(surface.get_height())/self.hatSize, xx=float(surface.get_width())/self.hatSize, yy=float(surface.get_height())/self.hatSize))
+            self.context.set_source(pattern)
+            self.context.paint()
+            self.context.set_source_rgba(0, 0, 0)
+            self.context.rectangle(0, 7, self.hatSize, 1)
+            self.context.fill()
+        elif command.startswith('down'):
+            pattern.set_matrix(cairo.Matrix(x0=0, y0=-1.0 * float(surface.get_height())/self.hatSize, xx=float(surface.get_width())/self.hatSize, yy=float(surface.get_height())/self.hatSize))
+            self.context.set_source(pattern)
+            self.context.paint()
+            self.context.set_source_rgba(0, 0, 0)
+            self.context.rectangle(0, 0, self.hatSize, 1)
+            self.context.fill()
+        elif command.startswith('left'):
+            pattern.set_matrix(cairo.Matrix(x0=1.0 * float(surface.get_width())/self.hatSize, y0=0, xx=float(surface.get_width())/self.hatSize, yy=float(surface.get_height())/self.hatSize))
+            self.context.set_source(pattern)
+            self.context.paint()
+            self.context.set_source_rgba(0, 0, 0)
+            self.context.rectangle(7, 0, 1, self.hatSize)
+            self.context.fill()
+        elif command.startswith('right'):
+            pattern.set_matrix(cairo.Matrix(x0=-1.0 * float(surface.get_width())/self.hatSize, y0=0, xx=float(surface.get_width())/self.hatSize, yy=float(surface.get_height())/self.hatSize))
+            self.context.set_source(pattern)
+            self.context.paint()
+            self.context.set_source_rgba(0, 0, 0)
+            self.context.rectangle(0, 0, 1, self.hatSize)
+            self.context.fill()
+        else:
+            return
+            
+        self.drawingArea.queue_draw()
 
-
+    def pixel(self, command):
+        logging.debug('pixel')
+        if command.find(',') != -1:
+            logging.debug('Its a coordinate')
+            if command[1] == ',' and command[0].isdigit() and command[2].isdigit():
+                x = int(command[0])
+                y = int(command[2])
+                colour = command[3:]
+                if len(colour) == 0:
+                    colour = self.lastColour
+                elif colour.isalpha():
+                    if self.tcolours.has_key(colour):
+                        r, g, b = self.tcolours.get(colour)
+                        if colour == random:
+                            r = random.random()
+                            g = random.random()
+                            b = random.random()
+                        self.context.set_source_rgba(r, g, b)
+                        self.context.rectangle(x, y, 1, 1)
+                        self.context.fill()
+                        self.drawingArea.queue_draw()
+                    else:
+                        logging.debug('Unknown colour')
+                else:
+                    logging.debug('Pixel command badly formatted')
+        elif command[0:1].isdigit() and command[2:].isalpha():
+            logging.debug('Its an offset')
+            
     def terminate(self):
         logging.debug('Terminating scratch thread')
         self.stop_event.set()
         threading.Thread.join(self)        
-                                
-                
+
 if __name__ == '__main__':
     ui = UnicornEmu()
     Gtk.main()

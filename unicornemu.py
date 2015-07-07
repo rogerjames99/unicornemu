@@ -112,7 +112,7 @@ class SocketThread(threading.Thread):
                     data = self.socket.recv(4)
                     if len(data) < 4:
                         logging.debug('RSP message < 4 bytes received - the reomte end has probably gone away')
-                        socket.close()
+                        self.socket.close()
                         break
                     temp = data[0:4] # Just in case the string hasn't shrunk. Do I need this?
                     message_length = struct.unpack('>L', temp)[0]
@@ -166,9 +166,9 @@ class SocketThread(threading.Thread):
                     elif command.startswith('level'):
                         logging.debug('level')
                     elif command.startswith('row'):
-                        logging.debug('row')
+                        self.row(command[3:])
                     elif command.startswith('col'):
-                        logging.debug('col')
+                        self.col(command[3:])
                     elif command.startswith('loadimage'):
                         logging.debug('loadimage')
                     elif command.startswith('saveimage'):
@@ -265,7 +265,43 @@ class SocketThread(threading.Thread):
                     logging.debug('Pixel command badly formatted')
         elif command[0:1].isdigit() and command[2:].isalpha():
             logging.debug('Its an offset')
-            
+    
+    def row(self, command):
+        logging.debug('row')
+        if command[0].isdigit() and int(command[0]) < 8 and command[1:].isalpha() and len(command[1:]) == 8:
+            for i in range(8):
+                if self.tcolours.has_key(command[1+i]):
+                    r, g, b = self.tcolours.get(command[1+i])
+                    self.context.set_source_rgba(r, g, b)
+                    self.context.rectangle(i, int(command[0]), 1, 1)
+                    self.context.fill()
+                else:
+                    break
+            if i == 7:
+                self.drawingArea.queue_draw()
+            else:
+                logging.debug('Pixel command badly formatted - bad clour')
+        else:
+            logging.debug('Pixel command badly formatted %s %s %d', command[0], coammnd[1:], len(command[1:]))
+
+    def col(self, command):
+        logging.debug('col')
+        if command[0].isdigit() and int(command[0]) < 8 and command[1:].isalpha() and len(command[1:]) == 8:
+            for i in range(8):
+                if self.tcolours.has_key(command[1+i]):
+                    r, g, b = self.tcolours.get(command[1+i])
+                    self.context.set_source_rgba(r, g, b)
+                    self.context.rectangle(int(command[0]), i, 1, 1)
+                    self.context.fill()
+                else:
+                    break
+            if i == 7:
+                self.drawingArea.queue_draw()
+            else:
+                logging.debug('Pixel command badly formatted - bad colour')
+        else:
+            logging.debug('Pixel command badly formatted %s %s %d', command[0], coammnd[1:], len(command[1:]))
+
     def terminate(self):
         logging.debug('Terminating scratch thread')
         self.stop_event.set()

@@ -3,7 +3,7 @@
 import logging
 import argparse
 import os
-from gi.repository import Gtk
+from gi.repository import Gtk , GLib, GObject
 import cairo
 import numpy as np
 import random
@@ -18,7 +18,6 @@ class UnicornEmu:
         # Constants
         self.imageSize = 1000
 
-        
         # Initialise logging
         logging.basicConfig(filename='unicornemu.log', level=logging.DEBUG, filemode='w', \
                              format='%(thread)x %(funcName)s %(lineno)d %(levelname)s:%(message)s')
@@ -85,15 +84,18 @@ class SocketThread(threading.Thread):
                 self.context.set_source_rgba(random.random(), random.random(), random.random())
                 self.context.rectangle(x, y, 1, 1)
                 self.context.fill()
-                
-        # dirty the drawingArea
-        logging.debug('queueing draw')
-        self.drawingArea.queue_draw()
-                
+        
+        GLib.idle_add(self.update(), 1)
+        
         # Intialise the thread
         threading.Thread.__init__(self)                
         self.stop_event = threading.Event()
         self.start()
+        
+    def update(self):
+        logging.debug('Dirtying the drawing area')
+        self.drawingArea.queue_draw()
+
         
     def run(self):
         while not self.stop_event.isSet():
@@ -185,19 +187,17 @@ class SocketThread(threading.Thread):
         logging.debug('alloff')
         self.context.set_source_rgb(0, 0, 0)
         self.context.paint()
-        logging.debug('queueing draw')
-        self.drawingArea.queue_draw()
+        GLib.idle_add(self.update())
         
     def sweep(self):
         logging.debug('sweep')
         for y in range(self.hatSize):
             for x in range(self.hatSize):
-				self.context.set_source_rgba(random.random(), random.random(), random.random())
-				self.context.rectangle(x, y, 1, 1)
-				self.context.fill()
-				logging.debug('queueing draw')
-				self.drawingArea.queue_draw()
-				time.sleep(0.05)
+                self.context.set_source_rgba(random.random(), random.random(), random.random())
+                self.context.rectangle(x, y, 1, 1)
+                self.context.fill()
+                GLib.idle_add(self.update())
+                time.sleep(0.05)
     
     def move(self, command):
         logging.debug('move')
@@ -241,8 +241,7 @@ class SocketThread(threading.Thread):
         else:
             return
             
-        logging.debug('queueing draw')
-        self.drawingArea.queue_draw()
+        GLib.idle_add(self.update())
 
     def pixel(self, command):
         logging.debug('pixel')
@@ -264,8 +263,7 @@ class SocketThread(threading.Thread):
                         self.context.set_source_rgba(r, g, b)
                         self.context.rectangle(x, y, 1, 1)
                         self.context.fill()
-                        logging.debug('queueing draw')
-                        self.drawingArea.queue_draw()
+                        GLib.idle_add(self.update())
                     else:
                         logging.debug('Unknown colour')
                 else:
@@ -285,8 +283,7 @@ class SocketThread(threading.Thread):
                 else:
                     break
             if i == 7:
-			logging.debug('queueing draw')
-			self.drawingArea.queue_draw()
+                GLib.idle_add(self.update())
             else:
                 logging.debug('Pixel command badly formatted - bad clour')
         else:
@@ -304,8 +301,7 @@ class SocketThread(threading.Thread):
                 else:
                     break
             if i == 7:
-				logging.debug('queueing draw')
-				self.drawingArea.queue_draw()
+                GLib.idle_add(self.update())
             else:
                 logging.debug('Pixel command badly formatted - bad colour')
         else:
@@ -317,8 +313,17 @@ class SocketThread(threading.Thread):
         threading.Thread.join(self)        
 
 if __name__ == '__main__':
+    # For backwards compatibity
+    GObject.threads_init()
+
     ui = UnicornEmu()
     Gtk.main()
+    
+    
+    
+    
+    
+    
 '''
     lettercolours = ['r', 'g', 'b', 'c', 'm', 'y', 'w', '0', '1', 'z']
     ledcolours = ['red', 'green', 'blue', 'cyan', 'magenta', 'yellow', 'white', 'off', 'on',

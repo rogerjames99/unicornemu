@@ -22,6 +22,8 @@ class UnicornEmu:
         # Initialise logging
         logging.basicConfig(filename='unicornemu.log', level=logging.DEBUG, filemode='w', \
                              format='%(thread)x %(funcName)s %(lineno)d %(levelname)s:%(message)s')
+                             
+        logging.debug('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         
         # Process command line options
         parser = argparse.ArgumentParser(description='Scratchgpio compatible emulator for Unicorn Hat')
@@ -85,6 +87,7 @@ class SocketThread(threading.Thread):
                 self.context.fill()
                 
         # dirty the drawingArea
+        logging.debug('queueing draw')
         self.drawingArea.queue_draw()
                 
         # Intialise the thread
@@ -182,17 +185,19 @@ class SocketThread(threading.Thread):
         logging.debug('alloff')
         self.context.set_source_rgb(0, 0, 0)
         self.context.paint()
+        logging.debug('queueing draw')
         self.drawingArea.queue_draw()
         
     def sweep(self):
         logging.debug('sweep')
         for y in range(self.hatSize):
             for x in range(self.hatSize):
-                self.context.set_source_rgba(random.random(), random.random(), random.random())
-                self.context.rectangle(x, y, 1, 1)
-                self.context.fill()
-                self.drawingArea.queue_draw()
-                time.sleep(0.05)
+				self.context.set_source_rgba(random.random(), random.random(), random.random())
+				self.context.rectangle(x, y, 1, 1)
+				self.context.fill()
+				logging.debug('queueing draw')
+				self.drawingArea.queue_draw()
+				time.sleep(0.05)
     
     def move(self, command):
         logging.debug('move')
@@ -236,6 +241,7 @@ class SocketThread(threading.Thread):
         else:
             return
             
+        logging.debug('queueing draw')
         self.drawingArea.queue_draw()
 
     def pixel(self, command):
@@ -258,6 +264,7 @@ class SocketThread(threading.Thread):
                         self.context.set_source_rgba(r, g, b)
                         self.context.rectangle(x, y, 1, 1)
                         self.context.fill()
+                        logging.debug('queueing draw')
                         self.drawingArea.queue_draw()
                     else:
                         logging.debug('Unknown colour')
@@ -278,7 +285,8 @@ class SocketThread(threading.Thread):
                 else:
                     break
             if i == 7:
-                self.drawingArea.queue_draw()
+			logging.debug('queueing draw')
+			self.drawingArea.queue_draw()
             else:
                 logging.debug('Pixel command badly formatted - bad clour')
         else:
@@ -296,7 +304,8 @@ class SocketThread(threading.Thread):
                 else:
                     break
             if i == 7:
-                self.drawingArea.queue_draw()
+				logging.debug('queueing draw')
+				self.drawingArea.queue_draw()
             else:
                 logging.debug('Pixel command badly formatted - bad colour')
         else:

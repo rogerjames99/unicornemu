@@ -85,7 +85,7 @@ class SocketThread(threading.Thread):
                 self.context.rectangle(x, y, 1, 1)
                 self.context.fill()
         
-        GLib.idle_add(self.update(), 1)
+        GLib.idle_add(self.update)
         
         # Intialise the thread
         threading.Thread.__init__(self)                
@@ -187,7 +187,7 @@ class SocketThread(threading.Thread):
         logging.debug('alloff')
         self.context.set_source_rgb(0, 0, 0)
         self.context.paint()
-        GLib.idle_add(self.update())
+        GLib.idle_add(self.update)
         
     def sweep(self):
         logging.debug('sweep')
@@ -196,7 +196,7 @@ class SocketThread(threading.Thread):
                 self.context.set_source_rgba(random.random(), random.random(), random.random())
                 self.context.rectangle(x, y, 1, 1)
                 self.context.fill()
-                GLib.idle_add(self.update())
+                GLib.idle_add(self.update)
                 time.sleep(0.05)
     
     def move(self, command):
@@ -241,7 +241,7 @@ class SocketThread(threading.Thread):
         else:
             return
             
-        GLib.idle_add(self.update())
+        GLib.idle_add(self.update)
 
     def pixel(self, command):
         logging.debug('pixel')
@@ -263,7 +263,7 @@ class SocketThread(threading.Thread):
                         self.context.set_source_rgba(r, g, b)
                         self.context.rectangle(x, y, 1, 1)
                         self.context.fill()
-                        GLib.idle_add(self.update())
+                        GLib.idle_add(self.update)
                     else:
                         logging.debug('Unknown colour')
                 else:
@@ -283,7 +283,7 @@ class SocketThread(threading.Thread):
                 else:
                     break
             if i == 7:
-                GLib.idle_add(self.update())
+                GLib.idle_add(self.update)
             else:
                 logging.debug('Pixel command badly formatted - bad clour')
         else:
@@ -301,7 +301,7 @@ class SocketThread(threading.Thread):
                 else:
                     break
             if i == 7:
-                GLib.idle_add(self.update())
+                GLib.idle_add(self.update)
             else:
                 logging.debug('Pixel command badly formatted - bad colour')
         else:

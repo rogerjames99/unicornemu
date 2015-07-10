@@ -239,24 +239,26 @@ class SocketThread(threading.Thread):
             self.context.rectangle(1, self.hatSize, self.hatSize, 1)
             self.context.fill()
         elif command.startswith('left'):
-            moveMatrix.translate(-1,0)
-            logmatrix(logging.debug, moveMatrix)
-            pattern.set_matrix(moveMatrix)
-            self.context.paint()
-            #self.context.set_source_rgba(0, 0, 0)
-            #self.context.rectangle(self.hatSize, 1, 1, self.hatSize)
-            #self.context.fill()
-        elif command.startswith('right'):
             moveMatrix.translate(1,0)
             logmatrix(logging.debug, moveMatrix)
             pattern.set_matrix(moveMatrix)
+            self.context.set_source(pattern)
             self.context.paint()
-            #self.context.set_source_rgba(0, 0, 0)
-            #self.context.rectangle(1, 1, 1, self.hatSize)
-            #self.context.fill()
+            self.context.set_source_rgba(0, 0, 0)
+            self.context.rectangle(self.hatSize, 1, 1, self.hatSize)
+            self.context.fill()
+        elif command.startswith('right'):
+            moveMatrix.translate(-1,0)
+            logmatrix(logging.debug, moveMatrix)
+            pattern.set_matrix(moveMatrix)
+            self.context.set_source(pattern)
+            self.context.paint()
+            self.context.set_source_rgba(0, 0, 0)
+            self.context.rectangle(1, 1, 1, self.hatSize)
+            self.context.fill()
         else:
             return
-            
+                        
         GLib.idle_add(self.update)
 
     def pixel(self, command):
@@ -264,8 +266,8 @@ class SocketThread(threading.Thread):
         if command.find(',') != -1:
             logging.debug('Its a coordinate')
             if command[1] == ',' and command[0].isdigit() and command[2].isdigit():
-                x = int(command[0])
-                y = int(command[2])
+                c = int(command[0])
+                r = int(command[2])
                 colour = command[3:]
                 if len(colour) == 0:
                     colour = self.lastColour
@@ -277,7 +279,7 @@ class SocketThread(threading.Thread):
                             g = random.random()
                             b = random.random()
                         self.context.set_source_rgba(r, g, b)
-                        self.context.rectangle(x, y, 1, 1)
+                        self.context.rectangle(c, r, 1, 1)
                         self.context.fill()
                         GLib.idle_add(self.update)
                     else:
@@ -290,38 +292,38 @@ class SocketThread(threading.Thread):
     def row(self, command):
         logging.debug('row')
         if command[0].isdigit() and int(command[0]) < 8 and command[1:].isalpha() and len(command[1:]) == 8:
-            for i in range(8):
-                if self.tcolours.has_key(command[1+i]):
-                    r, g, b = self.tcolours.get(command[1+i])
+            for col in range(1, self.hatSize + 1):
+                if self.tcolours.has_key(command[col]):
+                    r, g, b = self.tcolours.get(command[col])
                     self.context.set_source_rgba(r, g, b)
-                    self.context.rectangle(i, int(command[0]), 1, 1)
+                    self.context.rectangle(col, int(command[0]), 1, 1)
                     self.context.fill()
                 else:
                     break
-            if i == 7:
+            if col == self.hatSize:
                 GLib.idle_add(self.update)
             else:
                 logging.debug('Pixel command badly formatted - bad clour')
         else:
-            logging.debug('Pixel command badly formatted %s %s %d', command[0], coammnd[1:], len(command[1:]))
+            logging.debug('Pixel command badly formatted %s %s %d', command[0], command[1:], len(command[1:]))
 
     def col(self, command):
         logging.debug('col')
         if command[0].isdigit() and int(command[0]) < 8 and command[1:].isalpha() and len(command[1:]) == 8:
-            for i in range(8):
-                if self.tcolours.has_key(command[1+i]):
-                    r, g, b = self.tcolours.get(command[1+i])
+            for row in range(1,self.hatSize + 1):
+                if self.tcolours.has_key(command[row]):
+                    r, g, b = self.tcolours.get(command[row])
                     self.context.set_source_rgba(r, g, b)
-                    self.context.rectangle(int(command[0]), i, 1, 1)
+                    self.context.rectangle(int(command[0]), row, 1, 1)
                     self.context.fill()
                 else:
                     break
-            if i == 7:
+            if row == self.hatSize:
                 GLib.idle_add(self.update)
             else:
                 logging.debug('Pixel command badly formatted - bad colour')
         else:
-            logging.debug('Pixel command badly formatted %s %s %d', command[0], coammnd[1:], len(command[1:]))
+            logging.debug('Pixel command badly formatted %s %s %d', command[0], command[1:], len(command[1:]))
 
     def terminate(self):
         logging.debug('Terminating scratch thread')

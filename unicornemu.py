@@ -266,8 +266,8 @@ class SocketThread(threading.Thread):
         if command.find(',') != -1:
             logging.debug('Its a coordinate')
             if command[1] == ',' and command[0].isdigit() and command[2].isdigit():
-                c = int(command[0])
-                r = int(command[2])
+                col = int(command[0])
+                row = int(command[2])
                 colour = command[3:]
                 if len(colour) == 0:
                     colour = self.lastColour
@@ -279,7 +279,7 @@ class SocketThread(threading.Thread):
                             g = random.random()
                             b = random.random()
                         self.context.set_source_rgba(r, g, b)
-                        self.context.rectangle(c, r, 1, 1)
+                        self.context.rectangle(col, row, 1, 1)
                         self.context.fill()
                         GLib.idle_add(self.update)
                     else:
@@ -303,9 +303,9 @@ class SocketThread(threading.Thread):
             if col == self.hatSize:
                 GLib.idle_add(self.update)
             else:
-                logging.debug('Pixel command badly formatted - bad clour')
+                logging.debug('Row command badly formatted - bad colour')
         else:
-            logging.debug('Pixel command badly formatted %s %s %d', command[0], command[1:], len(command[1:]))
+            logging.debug('Row command badly formatted %s %s %d', command[0], command[1:], len(command[1:]))
 
     def col(self, command):
         logging.debug('col')
@@ -321,9 +321,9 @@ class SocketThread(threading.Thread):
             if row == self.hatSize:
                 GLib.idle_add(self.update)
             else:
-                logging.debug('Pixel command badly formatted - bad colour')
+                logging.debug('Col command badly formatted - bad colour')
         else:
-            logging.debug('Pixel command badly formatted %s %s %d', command[0], command[1:], len(command[1:]))
+            logging.debug('Col command badly formatted %s %s %d', command[0], command[1:], len(command[1:]))
 
     def terminate(self):
         logging.debug('Terminating scratch thread')

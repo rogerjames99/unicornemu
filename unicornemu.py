@@ -291,7 +291,7 @@ class SocketThread(threading.Thread):
     
     def row(self, command):
         logging.debug('row')
-        if command[0].isdigit() and int(command[0]) < 8 and command[1:].isalpha() and len(command[1:]) == 8:
+        if command[0].isdigit() and int(command[0]) > 0 and int(command[0]) < 9 and command[1:].isalpha() and len(command[1:]) == 8:
             for col in range(1, self.hatSize + 1):
                 if self.tcolours.has_key(command[col]):
                     r, g, b = self.tcolours.get(command[col])
@@ -309,7 +309,7 @@ class SocketThread(threading.Thread):
 
     def col(self, command):
         logging.debug('col')
-        if command[0].isdigit() and int(command[0]) < 8 and command[1:].isalpha() and len(command[1:]) == 8:
+        if command[0].isdigit() and int(command[0]) > 0 and int(command[0]) < 9 and command[1:].isalpha() and len(command[1:]) == 8:
             for row in range(1,self.hatSize + 1):
                 if self.tcolours.has_key(command[row]):
                     r, g, b = self.tcolours.get(command[row])

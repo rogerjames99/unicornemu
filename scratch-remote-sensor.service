@@ -1,0 +1,10 @@
+<?xml version="1.0" standalone='no'?><!--*-nxml-*-->
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+<name replace-wildcards="yes">%h Scratch Remote Sensor Server</name>
+<service>
+<type>_scratch._tcp</type>
+<port>42001</port>
+</service>
+</service-group>
+

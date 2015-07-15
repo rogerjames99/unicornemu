@@ -12,6 +12,8 @@ import socket
 import time
 import struct
 
+logFormat = '%(thread)x %(funcName)s %(lineno)d %(levelname)s:%(message)s'
+
 def logmatrix(logger, matrix):
     xx, yx, xy, yy, x0, y0 = matrix
     logger('Matrix xx=%f yx=%f xy=%f yy=%f x0=%f y0=%f', xx, yx, xy, yy, x0, y0)
@@ -23,7 +25,12 @@ class UnicornEmu:
 
         # Initialise logging
         logging.basicConfig(filename='unicornemu.log', level=logging.DEBUG, filemode='w', \
-                             format='%(thread)x %(funcName)s %(lineno)d %(levelname)s:%(message)s')
+                             format=logFormat)
+        console = logging.StreamHandler()
+        console.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(logFormat)
+        console.setFormatter(formatter)
+        logging.getLogger('').addHandler(console)
                              
         logging.debug('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         
@@ -77,7 +84,7 @@ class SocketThread(threading.Thread):
                     'c': (0, 1, 1), 'cyan': (0, 1, 1), 'm': (1, 0, 1), 'magenta': (1, 0, 1), 'y': (1, 1, 0), 'yellow': (1, 1, 0),
                     'w': (1, 1, 1), 'white': (1, 1, 1), '0': (0, 0, 0), 'off': (0, 0, 0), '1': (1, 1, 1), 'on': (1, 1, 1),
                     'z': (0, 0, 0), 'invert': (0, 0, 0), 'random' : (0,0,0)}
-        self.lastColour = 'off'
+        self.lastColour = (0,0,0)
 
         
        
@@ -117,7 +124,7 @@ class SocketThread(threading.Thread):
                 time.sleep(3)
                 continue
                 
-            self.socket.settimeout(1)
+            self.socket.settimeout(0.1)
                 
             while not self.stop_event.isSet():
                 try:
@@ -150,21 +157,22 @@ class SocketThread(threading.Thread):
                 
                 for command in commands:
                     if command.startswith('matrixuse'):
-                        logging.debug('matrixuse')
+                        self.matrixuse()
                     elif command == 'allon':
-                        logging.debug('allon')
+                        self.allon()
                     elif command == 'alloff':
                         self.alloff()
                     elif command == 'sweep':
                         self.sweep()
                     elif command.startswith('red'):
+                        self.setComponent('red', command[3:])
                         logging.debug('red')
                     elif command.startswith('green'):
                         logging.debug('green')
                     elif command.startswith('blue'):
                         logging.debug('blue')
                     elif command.startswith('colour'):
-                        logging.debug('colour')
+                        self.colour(command[6:])
                     elif command.startswith('pixel'):
                         self.pixel(command[5:])
                     elif command.startswith('bright'):
@@ -190,9 +198,53 @@ class SocketThread(threading.Thread):
                
         self.socket.close()
         
+    def colour(self, command):
+        logging.debug('colour')
+        paintColour = self.processColour(command)
+
+        if(paintColour[0] >= 0.):
+            self.lastColour = paintColour
+        
+    def setComponent(self, component, parameters):
+        logging.debug('setComponent component: %s parameters %s', component, parameters)
+        if component == 'red':
+            index = 0
+        elif component == 'green':
+            index = 1
+        elif component == 'blue':
+            index = 2
+        else:
+            logging.debug('setComponent invalid component')
+            return
+        
+        colour -1    
+        try:
+            colour = int(parameters)
+        except ValueError:
+            pass
+            
+        if colour >= 0 and colour < 256:
+            self.lastColour[index] = float(colour) / 255.
+            return
+        elif parameters == 'on':
+            self.lastColour[index] = 1
+        elif parameters == 'off':
+            self.lastColour[index] = 0
+        else:
+            logging.debug('setComponent invalid colour')
+
+    def matrixuse(slef):
+        logging.debug('matrixuse')
+        
     def alloff(self):
         logging.debug('alloff')
         self.context.set_source_rgb(0, 0, 0)
+        self.context.paint()
+        GLib.idle_add(self.update)
+        
+    def allon(self):
+        logging.debug('allon')
+        self.context.set_source_rgb(1, 1, 1)
         self.context.paint()
         GLib.idle_add(self.update)
         
@@ -260,34 +312,85 @@ class SocketThread(threading.Thread):
             return
                         
         GLib.idle_add(self.update)
-
+    
+    def processColour(self, colour):  
+        paintColour = (-1, 0, 0)
+        if len(colour) > 0 and colour.isalpha():
+            if self.tcolours.has_key(colour):
+                if colour == 'random':
+                    paintColour = (random.random(), random.random(), random.random())
+                elif colour == 'on':
+                    paintColour = self.lastColour
+                elif colour == 'invert':
+                    pass
+                else:
+                    paintColour = self.tcolours.get(colour)
+            else:
+                logging.debug('Unknown colour')
+        else:
+            # Check for some kind of number
+            colournumber = -1
+            if colour[0] == '#':
+                colour = colour.replace('#', '0x', 1)
+            logging.debug('Colour number string %s', colour)
+            try:
+                colournumber = int(colour, 0)
+            except ValueError:
+                pass
+            if colournumber >= 0 and colournumber < 0xffffff:
+                r = float((colournumber & 0xff0000) >> 16) / 255.
+                g = float((colournumber & 0xff00) >> 8) / 255.
+                b = float(colournumber & 0xff)/ 255.
+                paintColour = (r, g, b)
+            else:
+                logging.debug('Bad colour number')
+        return paintColour
+                
     def pixel(self, command):
         logging.debug('pixel')
         if command.find(',') != -1:
             logging.debug('Its a coordinate')
             if command[1] == ',' and command[0].isdigit() and command[2].isdigit():
-                col = int(command[0])
-                row = int(command[2])
+                try:
+                    col = int(command[0])
+                except ValueError:
+                    logging.debug('Bad column coordinate')
+                    col = 0
+                try:
+                    row = int(command[2])
+                except ValueError:
+                    logging.debug('Bad row coordinate')
+                    row = 0
                 colour = command[3:]
-                if len(colour) == 0:
-                    colour = self.lastColour
-                elif colour.isalpha():
-                    if self.tcolours.has_key(colour):
-                        r, g, b = self.tcolours.get(colour)
-                        if colour == random:
-                            r = random.random()
-                            g = random.random()
-                            b = random.random()
-                        self.context.set_source_rgba(r, g, b)
-                        self.context.rectangle(col, row, 1, 1)
-                        self.context.fill()
-                        GLib.idle_add(self.update)
-                    else:
-                        logging.debug('Unknown colour')
-                else:
-                    logging.debug('Pixel command badly formatted')
-        elif command[0:1].isdigit() and command[2:].isalpha():
+        elif len(command) > 0:
             logging.debug('Its an offset')
+            try:
+                if len(command) > 1:
+                    offset = int(command[0:2]) - 1
+                    colour = command[2:]
+                else:
+                    offset = int(command[0]) - 1
+                    colour = command[1:]
+            except ValueError:
+                logging.debug('Bad offset')
+                offset = 0
+            row, col = divmod(offset, self.hatSize)
+            row = row + 1
+            col = col + 1
+            
+        
+        if len(colour) > 0:
+            logging.debug('Col %d Row %d Colour %s', col, row, colour)
+            paintColour = self.processColour(colour)
+        else:
+            paintColour = self.lastColour
+
+        if(paintColour[0] >= 0.):
+            self.lastColour = paintColour
+            self.context.set_source_rgba(self.lastColour[0], self.lastColour[1], self.lastColour[2])
+            self.context.rectangle(col, row, 1, 1)
+            self.context.fill()
+            GLib.idle_add(self.update)
     
     def row(self, command):
         logging.debug('row')

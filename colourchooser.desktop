@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Encoding=UTF-8
+Name=Colour Chooser
+Comment=Gives a colour number for a colour
+Exec=colourchooser
+Icon=unicornemu.png
+Terminal=false
+

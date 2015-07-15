@@ -4,6 +4,6 @@ Encoding=UTF-8
 Name=Colour Chooser
 Comment=Gives a colour number for a colour
 Exec=colourchooser
-Icon=unicornemu.png
+Icon=colourchooser.png
 Terminal=false
 

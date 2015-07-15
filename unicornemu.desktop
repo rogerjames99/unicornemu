@@ -1,12 +1,9 @@
 [Desktop Entry]
-Encoding=UTF-8
-Version=1.0
 Type=Application
-Name=unicornemu.py
-Icon=application-default-icon
-Path=/home/roger/unicornemu
-Exec=python ./unicornemu.py
-StartupNotify=false
-StartupWMClass=Unicornemu.py
-OnlyShowIn=Unity;
-X-UnityGenerated=true
+Encoding=UTF-8
+Name=Unicorn Hat Emulator
+Comment=Unicorn Hat Emulator for Scratch
+Exec=unicornemu
+Icon=unicornemu.png
+Terminal=false
+

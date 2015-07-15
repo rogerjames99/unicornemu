@@ -44,7 +44,7 @@ class UnicornEmu:
         
         # Set up the gui                     
         self.builder = Gtk.Builder()
-        self.builder.add_from_file(os.path.join(os.getcwd(), 'unicornemu.ui'))
+        self.builder.add_from_file(os.path.join('/usr/share/unicornemu', 'unicornemu.ui'))
         self.builder.connect_signals(self)
         self.window = self.builder.get_object('unicornemuApplicationWindow')
         self.window.show()

@@ -6,6 +6,7 @@ cp colourchooser.desktop /usr/share/applications
 
 # Icons
 cp unicornemu.png /usr/share/icons/hicolor/48x48/apps
+cp colourchooser.png /usr/share/icons/hicolor/48x48/apps
 
 # Scripts
 cp unicornemu.py /usr/local/bin/unicornemu

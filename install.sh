@@ -16,3 +16,7 @@ cp colourchooser.py /usr/local/bin/colourchooser
 mkdir /usr/share/unicornemu
 cp unicornemu.ui /usr/share/unicornemu
 cp colourchooser.ui /usr/share/unicornemu
+
+# Avahi service def
+cp scratch-remote-sensor.service /etc/avahi/services
+

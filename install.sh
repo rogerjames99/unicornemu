@@ -25,3 +25,4 @@ cp scratch-remote-sensor.service /etc/avahi/services
 
 # Scratch projects
 cp unicorn.sb "/home/team/Documents/Scratch Projects"
+cp unicorn.sb "/home/team/Documents/Scratch Projects"

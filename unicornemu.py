@@ -3,7 +3,7 @@
 import logging
 import argparse
 import os
-from gi.repository import Gtk , GLib, GObject
+from gi.repository import Gtk , GLib, Gio, GObject
 import cairo
 import numpy as np
 import random
@@ -18,11 +18,48 @@ def logmatrix(logger, matrix):
     xx, yx, xy, yy, x0, y0 = matrix
     logger('Matrix xx=%f yx=%f xy=%f yy=%f x0=%f y0=%f', xx, yx, xy, yy, x0, y0)
 
-class UnicornEmu:
-    def __init__(self):
-        # Constants
-        self.imageSize = 1000
+class UnicornEmu(Gtk.Application):
+    class Window(object):
+        def __init__(self, application, *args):
+            # Constants
+            self.imageSize = 1000
 
+            
+            # Set up the gui                     
+            self.builder = Gtk.Builder()
+            self.builder.add_from_file(os.path.join('/usr/share/unicornemu', 'unicornemu.ui'))
+            self.builder.connect_signals(self)
+            self.mainWindow = self.builder.get_object('unicornemuApplicationWindow')
+            self.mainWindow.set_application(application)
+            self.mainWindow.show()
+            
+            # Use cairo to do the matrix stuff
+            self.surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.imageSize, self.imageSize)
+                    
+            self.scratch = SocketThread(application.hostname, 42001, self.surface, self.builder.get_object('drawingArea'))
+            
+        def close(self, *args):
+            self.mainWindow.destroy()
+            
+        def drawit(self, widget, cr):
+            logging.debug('Draw callback')
+            x ,y, width, height = cr.clip_extents()
+            xscale = float(width) / float(self.surface.get_width())
+            yscale = float(height) / float(self.surface.get_height())
+            cr.scale(xscale, yscale)
+            cr.set_operator(cairo.OPERATOR_SOURCE)
+            cr.set_source_surface(self.surface)
+            cr.paint()
+            return False
+                            
+        def quit_cb(self, *args):
+            logging.debug('Shutting down')
+            self.scratch.terminate()
+            logging.shutdown()
+            self.close()
+
+    # Gnome application initialization routine
+    def __init__(self, application_id, flags):
         # Initialise logging
         logging.basicConfig(filename='unicornemu.log', level=logging.DEBUG, filemode='w', \
                              format=logFormat)
@@ -41,37 +78,12 @@ class UnicornEmu:
 
         args = parser.parse_args()
         self.hostname = args.hostname                
-        
-        # Set up the gui                     
-        self.builder = Gtk.Builder()
-        self.builder.add_from_file(os.path.join('/usr/share/unicornemu', 'unicornemu.ui'))
-        self.builder.connect_signals(self)
-        self.window = self.builder.get_object('unicornemuApplicationWindow')
-        self.window.show()
-        
-        # Use cairo to do the matrix stuff
-        self.surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.imageSize, self.imageSize)
-                
-        self.scratch = SocketThread(self.hostname, 42001, self.surface, self.builder.get_object('drawingArea'))
-        
+        Gtk.Application.__init__(self, application_id=application_id, flags=flags)
+        self.connect("activate", self.new_window)
 
-    def drawit(self, widget, cr):
-        logging.debug('Draw callback')
-        x ,y, width, height = cr.clip_extents()
-        xscale = float(width) / float(self.surface.get_width())
-        yscale = float(height) / float(self.surface.get_height())
-        cr.scale(xscale, yscale)
-        cr.set_operator(cairo.OPERATOR_SOURCE)
-        cr.set_source_surface(self.surface)
-        cr.paint()
-        return False
-                        
-    def quit_cb(self, *args):
-        logging.debug('Shutting down')
-        self.scratch.terminate()
-        logging.shutdown()
-        Gtk.main_quit()
-        
+    def new_window(self, *args):
+        self.Window(self, self.hostname)
+
 class SocketThread(threading.Thread):
     def __init__(self, host, port, surface, drawingArea):
         self.host = host
@@ -433,10 +445,17 @@ class SocketThread(threading.Thread):
         self.stop_event.set()
         threading.Thread.join(self)        
 
-if __name__ == '__main__':
+def main():
+	# Initialize GTK Application
+	Application = UnicornEmu("uk.co.beardandsandals.unicornemu", Gio.ApplicationFlags.FLAGS_NONE)
+
+	# Start GUI
+	Application.run()
+
+if __name__ == "__main__":
     # For backwards compatibity
     GObject.threads_init()
-
-    ui = UnicornEmu()
-    Gtk.main()
+    
+    # Initialize the GTK application
+    main()
     

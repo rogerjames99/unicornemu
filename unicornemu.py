@@ -446,11 +446,12 @@ class SocketThread(threading.Thread):
         threading.Thread.join(self)        
 
 def main():
-	# Initialize GTK Application
-	Application = UnicornEmu("uk.co.beardandsandals.unicornemu", Gio.ApplicationFlags.FLAGS_NONE)
+    # Initialize GTK Application
+    Application = UnicornEmu("uk.co.beardandsandals.unicornemu", Gio.ApplicationFlags.FLAGS_NONE)
 
-	# Start GUI
-	Application.run()
+    # Start GUI
+
+    Application.run(None)
 
 if __name__ == "__main__":
     # For backwards compatibity

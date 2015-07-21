@@ -3,7 +3,7 @@
 import logging
 import argparse
 import os
-from gi.repository import Gtk , GLib, Gio, GObject
+from gi.repository import Gtk, GLib, Gio, GObject, DBus
 import cairo
 import numpy as np
 import random
@@ -11,6 +11,9 @@ import threading
 import socket
 import time
 import struct
+
+AvahiSupport = False
+
 
 logFormat = '%(thread)x %(funcName)s %(lineno)d %(levelname)s:%(message)s'
 
@@ -27,7 +30,11 @@ class UnicornEmu(Gtk.Application):
             
             # Set up the gui                     
             self.builder = Gtk.Builder()
-            self.builder.add_from_file(os.path.join('/usr/share/unicornemu', 'unicornemu.ui'))
+            try:
+                self.builder.add_from_file(os.path.join('/usr/share/unicornemu', 'unicornemu.ui'))
+            except FileError:
+                self.builder.add_from_file(os.path.join(os.getcwd(), 'unicornemu.ui'))
+                
             self.builder.connect_signals(self)
             self.mainWindow = self.builder.get_object('unicornemuApplicationWindow')
             self.mainWindow.set_application(application)
@@ -37,6 +44,9 @@ class UnicornEmu(Gtk.Application):
             self.surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.imageSize, self.imageSize)
                     
             self.scratch = SocketThread(application.hostname, 42001, self.surface, self.builder.get_object('drawingArea'))
+            
+            if AvahiSupport:
+                self.avahi = AvahiThread()
             
         def close(self, *args):
             self.mainWindow.destroy()
@@ -60,29 +70,76 @@ class UnicornEmu(Gtk.Application):
 
     # Gnome application initialization routine
     def __init__(self, application_id, flags):
-        # Initialise logging
-        logging.basicConfig(filename='unicornemu.log', level=logging.DEBUG, filemode='w', \
-                             format=logFormat)
-        console = logging.StreamHandler()
-        console.setLevel(logging.DEBUG)
-        formatter = logging.Formatter(logFormat)
-        console.setFormatter(formatter)
-        logging.getLogger('').addHandler(console)
-                             
-        logging.debug('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         
         # Process command line options
         parser = argparse.ArgumentParser(description='Scratchgpio compatible emulator for Unicorn Hat')
         parser.add_argument('hostname', default='localhost', nargs='?',
                    help='The hostname of the scratch desktop')
+        parser.add_argument('-v', '--verbose', nargs='?', const=True, default=False,
+                   help='Send debug logging to stderr')
+        parser.add_argument('-a', '--avahi', nargs='?', const=True, default=False,
+                   help='Enable avahi support')
 
         args = parser.parse_args()
         self.hostname = args.hostname                
         Gtk.Application.__init__(self, application_id=application_id, flags=flags)
         self.connect("activate", self.new_window)
 
+        # Initialise logging
+        logging.basicConfig(filename='unicornemu.log', level=logging.DEBUG, filemode='w', \
+                             format=logFormat)
+        console = logging.StreamHandler()
+        console.setLevel(logging.DEBUG)
+        if args.verbose:
+            formatter = logging.Formatter(logFormat)
+            console.setFormatter(formatter)
+            logging.getLogger('').addHandler(console)
+                             
+        logging.debug('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        
     def new_window(self, *args):
         self.Window(self, self.hostname)
+        
+class AvahiThread(threading.Thread):
+    def __init__(self):
+        # Intialise the thread
+        threading.Thread.__init__(self)                
+        self.start()
+
+    def service_resolved(*args):
+        print 'service resolved'
+        print 'name:', args[2]
+        print 'address:', args[7]
+        print 'port:', args[8]
+
+    def print_error(*args):
+        print 'error_handler'
+        print args[0]
+    
+    def myhandler(interface, protocol, name, stype, domain, flags):
+        print "Found service '%s' type '%s' domain '%s' " % (name, stype, domain)
+
+        server.ResolveService(interface, protocol, name, stype, 
+            domain, avahi.PROTO_UNSPEC, dbus.UInt32(0), 
+            reply_handler=service_resolved, error_handler=print_error)
+            
+    def run(self):
+        loop = DBusGMainLoop()
+
+        bus = dbus.SystemBus(mainloop=loop)
+
+        server = dbus.Interface( bus.get_object(avahi.DBUS_NAME, '/'),
+                'org.freedesktop.Avahi.Server')
+
+        sbrowser = dbus.Interface(bus.get_object(avahi.DBUS_NAME,
+                server.ServiceBrowserNew(avahi.IF_UNSPEC,
+                    avahi.PROTO_UNSPEC, TYPE, 'local', dbus.UInt32(0))),
+                avahi.DBUS_INTERFACE_SERVICE_BROWSER)
+
+        sbrowser.connect_to_signal("ItemNew", myhandler)
+
+        gobject.MainLoop().run()
+        
 
 class SocketThread(threading.Thread):
     def __init__(self, host, port, surface, drawingArea):
@@ -154,7 +211,7 @@ class SocketThread(threading.Thread):
                     continue                    
                 except socket.error:
                     logging.debug('Error receiving RSP message from Scratch')
-                    socket.close()
+                    self.socket.close()
                     break
                     
                 words = data.split(' ',1)

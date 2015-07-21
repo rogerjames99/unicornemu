@@ -384,35 +384,38 @@ class SocketThread(threading.Thread):
     
     def processColour(self, colour):  
         paintColour = (-1, 0, 0)
-        if len(colour) > 0 and colour.isalpha():
-            if self.tcolours.has_key(colour):
-                if colour == 'random':
-                    paintColour = (random.random(), random.random(), random.random())
-                elif colour == 'on':
-                    paintColour = self.lastColour
-                elif colour == 'invert':
-                    pass
+        if len(colour) > 0:
+            if colour.isalpha():
+                if self.tcolours.has_key(colour):
+                    if colour == 'random':
+                        paintColour = (random.random(), random.random(), random.random())
+                    elif colour == 'on':
+                        paintColour = self.lastColour
+                    elif colour == 'invert':
+                        pass
+                    else:
+                        paintColour = self.tcolours.get(colour)
                 else:
-                    paintColour = self.tcolours.get(colour)
+                    logging.debug('Unknown colour')
             else:
-                logging.debug('Unknown colour')
+                # Check for some kind of number
+                colournumber = -1
+                if colour[0] == '#':
+                    colour = colour.replace('#', '0x', 1)
+                logging.debug('Colour number string %s', colour)
+                try:
+                    colournumber = int(colour, 0)
+                except ValueError:
+                    pass
+                if colournumber >= 0 and colournumber < 0xffffff:
+                    r = float((colournumber & 0xff0000) >> 16) / 255.
+                    g = float((colournumber & 0xff00) >> 8) / 255.
+                    b = float(colournumber & 0xff)/ 255.
+                    paintColour = (r, g, b)
+                else:
+                    logging.debug('Bad colour number')
         else:
-            # Check for some kind of number
-            colournumber = -1
-            if colour[0] == '#':
-                colour = colour.replace('#', '0x', 1)
-            logging.debug('Colour number string %s', colour)
-            try:
-                colournumber = int(colour, 0)
-            except ValueError:
-                pass
-            if colournumber >= 0 and colournumber < 0xffffff:
-                r = float((colournumber & 0xff0000) >> 16) / 255.
-                g = float((colournumber & 0xff00) >> 8) / 255.
-                b = float(colournumber & 0xff)/ 255.
-                paintColour = (r, g, b)
-            else:
-                logging.debug('Bad colour number')
+            logging.debug('Badly formatted colour command')
         return paintColour
                 
     def pixel(self, command):

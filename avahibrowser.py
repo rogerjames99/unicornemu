@@ -11,31 +11,16 @@ class avahibrowser(Gio.Application):
             domain, avahi.PROTO_UNSPEC, dbus.UInt32(0), 
             reply_handler=service_resolved, error_handler=print_error)
 
-    def cb(proxy, sender, signal, args):
+    def cb(self, proxy, sender, signal, args):
         ignore = proxy
         ignore = sender
-        print 'ping', signal, args
+        print 'signal', signal, 'arguments', args
+        
+    def do_run(self):
+        print 'Running'
 
     def do_activate(self):
         print 'Activated'
-            
-    def do_run_mainloop(self):
-        print 'Running'
-        
-        
-    # Gnome application initialization routine
-    def __init__(self, application_id, flags):
-        
-        print 'Got to here'
-        
-        Gio.Application.__init__(self, application_id=application_id, flags=flags)
-        print 'Got to here'
-        '''
-        dbus = None
-        avahiserver = None
-
-        browser_sigs = []
-
 
         self.systemDBusConnection = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
 
@@ -57,18 +42,21 @@ class avahibrowser(Gio.Application):
                                             avahi.DBUS_INTERFACE_SERVICE_BROWSER,
                                             None)
                                             
-        self.avahibrowser.connect("g-signal", self.cb)
-        '''
-        print 'finished the init'
+        self.avahibrowser.connect('g-signal', self.cb)
+        
+            
+    # Gnome application initialization routine
+    def __init__(self, application_id, flags):
+        Gio.Application.__init__(self, application_id=application_id, flags=flags)
 
 
 if __name__ == "__main__":
     # For backwards compatibity
     GObject.threads_init()
+    
     Application = avahibrowser("uk.co.beardandsandals.avahibrowser", Gio.ApplicationFlags.FLAGS_NONE)
-    print ' Contructed the app object'
+    Application.hold()
     Application.run(None)
-    print 'Fallen  off the bottom'
 
 
 

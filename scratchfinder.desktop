@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
 Encoding=UTF-8
-Name=Unicorn Hat Emulator
-Comment=Unicorn Hat Emulator for Scratch
-Exec=unicornemu.py
-Icon=unicornemu.png
-Terminal=false
+Name=ScratchFinder
+Comment=ZeroConf Scratch Remote Sensor Protocol enumerator
+Exec=scratch-finder.py
+Icon=scratch-finder.png
+Terminal=true
 

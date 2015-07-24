@@ -346,7 +346,9 @@ class avahibrowser(Gio.Application):
     def new_browser_proxy_callback(self, source_object, res, user_data):
         self.avahibrowser = Gio.DBusProxy.new_finish(res)
         self.avahibrowser.connect('g-signal', self.browserCallback)
-        
+        self.systemDBusConnection.signal_unsubscribe(self.ItemNewId)
+        self.systemDBusConnection.signal_unsubscribe(self.AllForNowId)
+               
     def new_server_proxy_callback(self, source_object, res, user_data):
         self.avahiserver = Gio.DBusProxy.new_finish(res)        
         avahibrowserpath = self.avahiserver.ServiceBrowserNew('(iissu)',

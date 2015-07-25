@@ -32,12 +32,18 @@ class UnicornEmu(Gtk.Application):
             self.builder = Gtk.Builder()
             try:
                 self.builder.add_from_file(os.path.join('/usr/share/unicornemu', 'unicornemu.ui'))
-            except FileError:
+            except GLib.Error:
                 self.builder.add_from_file(os.path.join(os.getcwd(), 'unicornemu.ui'))
                 
             self.builder.connect_signals(self)
             self.mainWindow = self.builder.get_object('unicornemuApplicationWindow')
             self.mainWindow.set_application(application)
+            if application.hostname == 'localhost':
+                # Get real hostname
+                title = socket.gethostname()
+            else:
+                title = application.hostname
+            self.builder.get_object('unicornemuMainMatrixLabel').set_text(title)
             self.mainWindow.show()
             
             # Use cairo to do the matrix stuff

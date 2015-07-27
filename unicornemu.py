@@ -14,8 +14,6 @@ import avahi
 import avahi
 import socket
 
-AvahiSupport = False
-
 # Node definitions for accessing Avahi via DBUS
 
 NodeInfoForServer = Gio.DBusNodeInfo.new_for_xml(
@@ -332,6 +330,7 @@ class UnicornEmu(Gtk.Application):
             ###############################################################################################################
  
             def __init__(self, host, port, surface, drawingArea):
+                print 'Creating new creatNewMatrix object', self
                 self.host = host
                 self.port = port
                 self.surface = surface
@@ -358,8 +357,10 @@ class UnicornEmu(Gtk.Application):
                 self.update()
                 
                 # Connect to scratch
-                self.socketClient = Gio.SocketClient.new()
-                self.socketClient.connect_to_host_async(host, port, None, self.connect_to_host_async_callback, object)
+                self.socketClient = Gio.SocketClient.new() # Kepp this hanging abput if case of time outs etc.
+                print 'Started connection process', GLib.get_monotonic_time()
+                self.socketClient.connect_to_host_async(host, port, None, self.connect_to_host_async_callback, None)
+                
                 
             ###############################################################################################################
             # Callbacks                
@@ -369,119 +370,163 @@ class UnicornEmu(Gtk.Application):
                 pass
             
             def connect_to_host_async_callback(self, source_object, res, user_data):
+                print 'async_callback', GLib.get_monotonic_time()
                 try:
                     self.socketConnection = self.socketClient.connect_to_host_finish(res)
                 except GLib.Error, error:
-                    print 'code', error.code, 'domain', error.domain, 'message', error.message
-                    GLib.timeout_add_seconds(30, self.socketClient.connect_to_host_async,
-                                                self.host,
-                                                self.port,
-                                                None,
-                                                self.connect_to_host_async_timer_callback,
-                                                object)
-                    return
+                    print 'connect callback code', error.code, 'domain', error.domain, 'message', error.message
+                    if error.code == Gio.IOErrorEnum.CONNECTION_REFUSED:
+                        # Try again in 30 seconds
+                        print 'creating timeout 1'
+                        GLib.timeout_add_seconds(30, self.retry_connect)
+                        return
+                    else:
+                        raise
                     
-                print 'Connected at first attempt'
-                
+                if self.socketConnection:
+                    print 'Connected at first attempt'
+                    self.inputStream = self.socketConnection.get_input_stream()
+                    # Start read scratch messages
+                    self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
+                else:
+                    print 'should not get here 1'
+                    
             def connect_to_host_async_timer_callback(self, source_object, res, user_data):
                 try:
                     self.socketConnection = self.socketClient.connect_to_host_finish(res)
                 except GLib.Error, error:
-                    print 'code', error.code, 'domain', error.domain, 'message', error.message
-                    return
+                    print 'timer callback code', error.code, 'domain', error.domain, 'message', error.message
+                    if error.code == Gio.IOErrorEnum.CONNECTION_REFUSED:
+                        # Try again in 30 seconds
+                        print 'creating timeout 2'
+                        GLib.timeout_add_seconds(30, self.retry_connect)
+                        return
+                    else:
+                        raise
+                    
+                if self.socketConnection:
+                    print 'Connected after a retry'
+                    self.inputStream = self.socketConnection.get_input_stream()
+                    self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
+                else:
+                    print 'should not get here 2'
                 
-                print 'Socket connected after timeout'
+            def read_scratch_message_content_callback(self, source_object, res, user_data):
+                print 'read_scratch_message_content_callback', self, source_object, user_data
+                try:
+                    scratch_message = self.inputStream.read_bytes_finish(res)
+                except GLib.Error, error:
+                    print 'code', error.code, 'domain', error.domain, 'message', error.message
+                    raise
+                
+                if scratch_message.get_size() != self.scratch_message_length:
+                    # I assume the connection is broken in some way so close it and start again
+                    # May need to rethink this if I see fragmentation
+                    print 'Reconnecting'
+                    self.socketConnection.close()
+                    self.socketClient = Gio.SocketClient.new()
+                    GLib.timeout_add_seconds(30, self.retry_connect)
+                
+                print 'Scratch message', scratch_message.get_data()
+
+                # Process message
+                self.process_scratch_message(scratch_message.get_data())
+                
+                # Start again
+                self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
+                
+            def read_scratch_message_size_callback(self, source_object, res, user_data):
+                print 'read_scratch_message_size_callback', self, source_object, user_data
+                try:
+                    count_bytes = self.inputStream.read_bytes_finish(res)
+                except GLib.Error, error:
+                    print 'code', error.code, 'domain', error.domain, 'message', error.message
+                    raise
+                
+                if count_bytes.get_size() != 4:
+                    # I assume the connection is broken in some way so close it and start again
+                    print 'Reconnecting'
+                    self.socketCOnnection.close()
+                    socketClient = Gio.SocketClient.new()
+                    socketClient.connect_to_host_async(host, port, None, self.connect_to_host_async_callback, None)
+                
+                self.scratch_message_length = struct.unpack('>L', count_bytes.get_data())[0]
+                
+                
+                print 'Scratch message length', self.scratch_message_length
+                # Read the content of the scratch message
+                self.inputStream.read_bytes_async(self.scratch_message_length, GLib.PRIORITY_HIGH, None, 
+                                                self.read_scratch_message_content_callback, None)
+
+
+            ###############################################################################################################
+            # Methods              
+            ###############################################################################################################
+            
+            def retry_connect(self):
+                print 'retry connect'
+                self.socketClient.connect_to_host_async(self.host,
+                                                        self.port,
+                                                        None,
+                                                        self.connect_to_host_async_timer_callback, None)
+                # make this a one off timer
+                return False
+
+            def process_scratch_message(self, message):
+                words = message.split(' ',1)
+            
+                if words[0].lower() != 'broadcast':
+                    logging.debug('Discarding message; not a broadcast')
+                    return
+                    
+                broadcast_message = words[1][1:-1]
+                broadcast_message = broadcast_message.lower()
+                commands = broadcast_message.split(' ')
+                
+                for command in commands:
+                    if command.startswith('matrixuse'):
+                        self.matrixuse()
+                    elif command == 'allon':
+                        self.allon()
+                    elif command == 'alloff':
+                        self.alloff()
+                    elif command == 'sweep':
+                        self.sweep()
+                    elif command.startswith('red'):
+                        self.setComponent('red', command[3:])
+                        logging.debug('red')
+                    elif command.startswith('green'):
+                        logging.debug('green')
+                    elif command.startswith('blue'):
+                        logging.debug('blue')
+                    elif command.startswith('colour'):
+                        self.colour(command[6:])
+                    elif command.startswith('pixel'):
+                        self.pixel(command[5:])
+                    elif command.startswith('bright'):
+                        logging.debug('bright')
+                    elif command.startswith('matrixpattern'):
+                        logging.debug('matrixpattern')
+                    elif command.startswith('move'):
+                        self.move(command[4:])
+                    elif command == 'invert':
+                        logging.debug('invert')
+                    elif command.startswith('level'):
+                        logging.debug('level')
+                    elif command.startswith('row'):
+                        self.row(command[3:])
+                    elif command.startswith('col'):
+                        self.col(command[3:])
+                    elif command.startswith('loadimage'):
+                        logging.debug('loadimage')
+                    elif command.startswith('saveimage'):
+                        logging.debug('saveimage')
+                    elif command.startswith('load2image'):
+                        logging.debug('load2image')
 
             def update(self):
                 logging.debug('Dirtying the drawing area')
                 self.drawingArea.queue_draw()
-                
-            def run(self):
-                while not self.stop_event.isSet():
-                    try:
-                        logging.debug('Trying')
-                        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                        self.socket.connect((self.host, self.port))
-                        logging.debug('Connected')
-                    except socket.error:
-                        logging.debug('There was an error connecting to Scratch!')
-                        logging.debug("I couldn't find a Mesh session at host: %s, port: %d", self.host, self.port)
-                        time.sleep(3)
-                        continue
-                        
-                    self.socket.settimeout(0.1)
-                        
-                    while not self.stop_event.isSet():
-                        try:
-                            data = self.socket.recv(4)
-                            if len(data) < 4:
-                                logging.debug('RSP message < 4 bytes received - the reomte end has probably gone away')
-                                self.socket.close()
-                                break
-                            temp = data[0:4] # Just in case the string hasn't shrunk. Do I need this?
-                            message_length = struct.unpack('>L', temp)[0]
-                            logging.debug('Scratch RSP data length %d', message_length)
-                            data = self.socket.recv(message_length)
-                            logging.debug('Scratch RSP received data: %s', data)
-                        except socket.timeout:
-                            continue                    
-                        except socket.error:
-                            logging.debug('Error receiving RSP message from Scratch')
-                            self.socket.close()
-                            break
-                            
-                        words = data.split(' ',1)
-                        
-                        if words[0].lower() != 'broadcast':
-                            logging.debug('Discarding message; not a broadcast')
-                            continue
-                            
-                        broadcast_message = words[1][1:-1]
-                        broadcast_message = broadcast_message.lower()
-                        commands = broadcast_message.split(' ')
-                        
-                        for command in commands:
-                            if command.startswith('matrixuse'):
-                                self.matrixuse()
-                            elif command == 'allon':
-                                self.allon()
-                            elif command == 'alloff':
-                                self.alloff()
-                            elif command == 'sweep':
-                                self.sweep()
-                            elif command.startswith('red'):
-                                self.setComponent('red', command[3:])
-                                logging.debug('red')
-                            elif command.startswith('green'):
-                                logging.debug('green')
-                            elif command.startswith('blue'):
-                                logging.debug('blue')
-                            elif command.startswith('colour'):
-                                self.colour(command[6:])
-                            elif command.startswith('pixel'):
-                                self.pixel(command[5:])
-                            elif command.startswith('bright'):
-                                logging.debug('bright')
-                            elif command.startswith('matrixpattern'):
-                                logging.debug('matrixpattern')
-                            elif command.startswith('move'):
-                                self.move(command[4:])
-                            elif command == 'invert':
-                                logging.debug('invert')
-                            elif command.startswith('level'):
-                                logging.debug('level')
-                            elif command.startswith('row'):
-                                self.row(command[3:])
-                            elif command.startswith('col'):
-                                self.col(command[3:])
-                            elif command.startswith('loadimage'):
-                                logging.debug('loadimage')
-                            elif command.startswith('saveimage'):
-                                logging.debug('saveimage')
-                            elif command.startswith('load2image'):
-                                logging.debug('load2image')
-                       
-                self.socket.close()
                 
             def colour(self, command):
                 logging.debug('colour')
@@ -716,11 +761,6 @@ class UnicornEmu(Gtk.Application):
                 else:
                     logging.debug('Col command badly formatted %s %s %d', command[0], command[1:], len(command[1:]))
 
-            def terminate(self):
-                logging.debug('Terminating scratch thread')
-                self.stop_event.set()
-                threading.Thread.join(self)        
-
         ###############################################################################################################
         # Initialisation
         ###############################################################################################################
@@ -751,13 +791,12 @@ class UnicornEmu(Gtk.Application):
             # Use cairo to do the matrix stuff
             self.surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.imageSize, self.imageSize)
                     
-            #self.scratch = SocketThread(application.hostname, 42001, self.surface, self.builder.get_object('drawingArea'))
             self.primaryMatrix = self.createNewMatrix(application.hostname, 42001, self.surface, self.builder.get_object('drawingArea'))
-        
+
         ###############################################################################################################
         # Callbacks                
         ###############################################################################################################
-        
+
         def quit_cb(self, *args):
             logging.debug('Shutting down')
             logging.shutdown()

@@ -330,7 +330,7 @@ class UnicornEmu(Gtk.Application):
             ###############################################################################################################
  
             def __init__(self, host, port, surface, drawingArea):
-                print 'Creating new creatNewMatrix object', self
+                logging.debug('Creating new creatNewMatrix object')
                 self.host = host
                 self.port = port
                 self.surface = surface
@@ -358,7 +358,7 @@ class UnicornEmu(Gtk.Application):
                 
                 # Connect to scratch
                 self.socketClient = Gio.SocketClient.new() # Kepp this hanging abput if case of time outs etc.
-                print 'Started connection process', GLib.get_monotonic_time()
+                logging.debug('Started connection process %d', GLib.get_monotonic_time())
                 self.socketClient.connect_to_host_async(host, port, None, self.connect_to_host_async_callback, None)
                 
                 
@@ -370,64 +370,64 @@ class UnicornEmu(Gtk.Application):
                 pass
             
             def connect_to_host_async_callback(self, source_object, res, user_data):
-                print 'async_callback', GLib.get_monotonic_time()
+                logging.debug( 'async_callback %d', GLib.get_monotonic_time())
                 try:
                     self.socketConnection = self.socketClient.connect_to_host_finish(res)
                 except GLib.Error, error:
-                    print 'connect callback code', error.code, 'domain', error.domain, 'message', error.message
+                    logging.debug('connect callback code %d domain %s message %s', error.code, error.domain, error.message)
                     if error.code == Gio.IOErrorEnum.CONNECTION_REFUSED:
                         # Try again in 30 seconds
-                        print 'creating timeout 1'
+                        logging.debug('creating timeout 1')
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     else:
                         raise
                     
                 if self.socketConnection:
-                    print 'Connected at first attempt'
+                    logging.debug('Connected at first attempt')
                     self.inputStream = self.socketConnection.get_input_stream()
                     # Start read scratch messages
                     self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
                 else:
-                    print 'should not get here 1'
+                    logging.debug('should not get here 1')
                     
             def connect_to_host_async_timer_callback(self, source_object, res, user_data):
                 try:
                     self.socketConnection = self.socketClient.connect_to_host_finish(res)
                 except GLib.Error, error:
-                    print 'timer callback code', error.code, 'domain', error.domain, 'message', error.message
+                    logging.debug("timer callback code %d domain '%s' message' %s'", error.code, error.domain, error.message)
                     if error.code == Gio.IOErrorEnum.CONNECTION_REFUSED:
                         # Try again in 30 seconds
-                        print 'creating timeout 2'
+                        logging.debug('creating timeout 2')
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     else:
                         raise
                     
                 if self.socketConnection:
-                    print 'Connected after a retry'
+                    logging.debug('Connected after a retry')
                     self.inputStream = self.socketConnection.get_input_stream()
                     self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
                 else:
-                    print 'should not get here 2'
+                    logging.debug('should not get here 2')
                 
             def read_scratch_message_content_callback(self, source_object, res, user_data):
-                print 'read_scratch_message_content_callback', self, source_object, user_data
+                logging.debug('read_scratch_message_content_callback')
                 try:
                     scratch_message = self.inputStream.read_bytes_finish(res)
                 except GLib.Error, error:
-                    print 'code', error.code, 'domain', error.domain, 'message', error.message
+                    logging.debug("code %d domain '%s' message '%s'", error.code, error.domain, error.message)
                     raise
                 
                 if scratch_message.get_size() != self.scratch_message_length:
                     # I assume the connection is broken in some way so close it and start again
                     # May need to rethink this if I see fragmentation
-                    print 'Reconnecting'
+                    logging.debug('Reconnecting')
                     self.socketConnection.close()
                     self.socketClient = Gio.SocketClient.new()
                     GLib.timeout_add_seconds(30, self.retry_connect)
                 
-                print 'Scratch message', scratch_message.get_data()
+                logging.debug("Scratch message '%s'", scratch_message.get_data())
 
                 # Process message
                 self.process_scratch_message(scratch_message.get_data())
@@ -436,16 +436,16 @@ class UnicornEmu(Gtk.Application):
                 self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
                 
             def read_scratch_message_size_callback(self, source_object, res, user_data):
-                print 'read_scratch_message_size_callback', self, source_object, user_data
+                logging.debug('read_scratch_message_size_callback')
                 try:
                     count_bytes = self.inputStream.read_bytes_finish(res)
                 except GLib.Error, error:
-                    print 'code', error.code, 'domain', error.domain, 'message', error.message
+                    logging.debug("code %d domain '%s' message '%s'", error.code, error.domain, error.message)
                     raise
                 
                 if count_bytes.get_size() != 4:
                     # I assume the connection is broken in some way so close it and start again
-                    print 'Reconnecting'
+                    logging.debug('Reconnecting')
                     self.socketCOnnection.close()
                     socketClient = Gio.SocketClient.new()
                     socketClient.connect_to_host_async(host, port, None, self.connect_to_host_async_callback, None)
@@ -453,7 +453,7 @@ class UnicornEmu(Gtk.Application):
                 self.scratch_message_length = struct.unpack('>L', count_bytes.get_data())[0]
                 
                 
-                print 'Scratch message length', self.scratch_message_length
+                logging.debug('Scratch message length %d', self.scratch_message_length)
                 # Read the content of the scratch message
                 self.inputStream.read_bytes_async(self.scratch_message_length, GLib.PRIORITY_HIGH, None, 
                                                 self.read_scratch_message_content_callback, None)
@@ -464,7 +464,7 @@ class UnicornEmu(Gtk.Application):
             ###############################################################################################################
             
             def retry_connect(self):
-                print 'retry connect'
+                logging.debug('retry connect')
                 self.socketClient.connect_to_host_async(self.host,
                                                         self.port,
                                                         None,
@@ -663,7 +663,7 @@ class UnicornEmu(Gtk.Application):
                         colournumber = -1
                         if colour[0] == '#':
                             colour = colour.replace('#', '0x', 1)
-                        logging.debug('Colour number string %s', colour)
+                        logging.debug('Colour number string %s' % colour)
                         try:
                             colournumber = int(colour, 0)
                         except ValueError:
@@ -713,7 +713,7 @@ class UnicornEmu(Gtk.Application):
                     
                 
                 if len(colour) > 0:
-                    logging.debug('Col %d Row %d Colour %s', col, row, colour)
+                    logging.debug('Col %d Row %d Colour %s' % col, row, colour)
                     paintColour = self.processColour(colour)
                 else:
                     paintColour = self.lastColour
@@ -871,25 +871,38 @@ class UnicornEmu(Gtk.Application):
     def browserCallback(self, proxy, sender, signal, args):
         if signal == 'ItemNew':
             '''
-            ResolveService
-                in i interface
-                in i protocol
-                in s name
-                in s type
-                in s domain
-                in i aprotocol
-                in u flags
-                out i interface
-                out i protocol
-                out s name
-                out s type
-                out s domain
-                out s host
-                out i aprotocol
-                out s address
-                out q port
-                out aay txt
-                out u flags
+            <signal name="ItemNew">
+              <arg name="interface" type="i"/>
+              <arg name="protocol" type="i"/>
+              <arg name="name" type="s"/>
+              <arg name="type" type="s"/>
+              <arg name="domain" type="s"/>
+              <arg name="flags" type="u"/>
+            </signal>
+            '''
+            
+            '''
+            <method name="ResolveService">
+              <arg name="interface" type="i" direction="in"/>
+              <arg name="protocol" type="i" direction="in"/>
+              <arg name="name" type="s" direction="in"/>
+              <arg name="type" type="s" direction="in"/>
+              <arg name="domain" type="s" direction="in"/>
+              <arg name="aprotocol" type="i" direction="in"/>
+              <arg name="flags" type="u" direction="in"/>
+
+              <arg name="interface" type="i" direction="out"/>
+              <arg name="protocol" type="i" direction="out"/>
+              <arg name="name" type="s" direction="out"/>
+              <arg name="type" type="s" direction="out"/>
+              <arg name="domain" type="s" direction="out"/>
+              <arg name="host" type="s" direction="out"/>
+              <arg name="aprotocol" type="i" direction="out"/>
+              <arg name="address" type="s" direction="out"/>
+              <arg name="port" type="q" direction="out"/>
+              <arg name="txt" type="aay" direction="out"/>
+              <arg name="flags" type="u" direction="out"/>
+            </method>
             '''
             returns = self.avahiserver.ResolveService('(iisssiu)',
                     args[0], # Interface
@@ -899,10 +912,39 @@ class UnicornEmu(Gtk.Application):
                     args[4], # Domain
                     avahi.PROTO_UNSPEC, # aprotocol 
                     0) # flags
-            print "Found service - name '%s\ntype '%s\ndomain '%s'\nhost '%s'\naprotocol %d\nip-address '%s'\nport number #%d" \
-                    % (returns[2], returns[3], returns[4], returns[5], returns[6], returns[7], returns[8])
+            logging.debug("Found service - name '%s\ntype '%s\ndomain '%s'\nhost '%s'\naprotocol %d\nip-address '%s'\nport number #%d", \
+                    returns[2], returns[3], returns[4], returns[5], returns[6], returns[7], returns[8])
+        elif signal == 'ItemRemove':
+            '''
+            <signal name="ItemRemove"
+              <arg name="interface" type="i"/>
+              <arg name="protocol" type="i"/>
+              <arg name="name" type="s"/>
+              <arg name="type" type="s"/>
+              <arg name="domain" type="s"/>
+              <arg name="flags" type="u"/>
+            </signal>
+            '''
+            logging.debug('ItemRemoved ignored')
+        elif signal == 'Failure':
+            '''
+            <signal name="Failure">
+              <arg name="error" type="s"/>
+            </signal>
+            '''
+            logging.debug('Failure ignored')
+        elif signal == 'AllForNow':
+            '''
+            <signal name="AllForNow"/>
+            '''
+            logging.debug('AllForNow ignored')
+        elif signal == 'CacheExhausted':
+            '''
+            <signal name="CacheExhausted"/>
+            '''
+            logging.debug('CacheExhausted ignored')
         else:
-            print 'signal', signal, 'arguments', args
+            logging.debug("ignoring signal signal %s'", signal)
         
     def bus_get_callback(self, source_object, res, user_data):
         self.systemDBusConnection = Gio.bus_get_finish(res)
@@ -931,7 +973,7 @@ class UnicornEmu(Gtk.Application):
             # Pass the signal on to my GObject signal handler
             self.browserCallback(None, sender_name, signal_name, arguments)
         else:
-            print 'Should never see this'
+            logging.debug('Should never see this')
             Application.release()
 
                                             

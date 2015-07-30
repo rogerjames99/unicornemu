@@ -329,8 +329,9 @@ class UnicornEmu(Gtk.Application):
             # Initialisation
             ###############################################################################################################
  
-            def __init__(self, host, port, surface, drawingArea):
+            def __init__(self, window, host, port, surface, drawingArea):
                 logging.debug('Creating new creatNewMatrix object')
+                self.window = window
                 self.host = host
                 self.port = port
                 self.surface = surface
@@ -374,16 +375,30 @@ class UnicornEmu(Gtk.Application):
                 try:
                     self.socketConnection = self.socketClient.connect_to_host_finish(res)
                 except GLib.Error, error:
-                    logging.debug('connect callback code %d domain %s message %s', error.code, error.domain, error.message)
-                    if error.code == Gio.IOErrorEnum.CONNECTION_REFUSED:
+                    if error.code == Gio.IOErrorEnum.CONNECTION_REFUSED or \
+                            error.code == Gio.IOErrorEnum.TIMED_OUT:
+                        # Scratch has not responded or has refused the connection
                         # Try again in 30 seconds
-                        logging.debug('creating timeout 1')
-                        GLib.timeout_add_seconds(30, self.retry_connect)
+                        logging.debug('creating timeout %d', error.code)
                         return
+                    elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND or \
+                            error.code == Gio.IOErrorEnum.FAILED: # Gtk seems to return zero for host not found
+                        # Cannot resolve the hostname
+                        logging.debug('Cannot resolve the hostname')
+                        dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
+                        dialog.run()
+                        self.window.close()
+                        return
+                    elif error.code == Gio.IOErrorEnum.NETWORK_UNREACHABLE or \
+                            error.code == Gio.IOErrorEnum.HOST_UNREACHABLE:
+                        # Network failure (ICMP destination unreachable code)
+                        logging.debug('ICMP destination unreachable %d', error.code)
+                        raise
                     else:
+                        logging.debug("connect callback code %d domain '%s' message '%s'", error.code, error.domain, error.message)
                         raise
                     
-                if self.socketConnection:
+                if self.socketConnection != None:
                     logging.debug('Connected at first attempt')
                     self.inputStream = self.socketConnection.get_input_stream()
                     # Start read scratch messages
@@ -396,11 +411,22 @@ class UnicornEmu(Gtk.Application):
                     self.socketConnection = self.socketClient.connect_to_host_finish(res)
                 except GLib.Error, error:
                     logging.debug("timer callback code %d domain '%s' message' %s'", error.code, error.domain, error.message)
-                    if error.code == Gio.IOErrorEnum.CONNECTION_REFUSED:
+                    if error.code == Gio.IOErrorEnum.CONNECTION_REFUSED or \
+                            error.code == Gio.IOErrorEnum.TIMED_OUT:
+                        # Scratch has not responded or has refused the connection
                         # Try again in 30 seconds
-                        logging.debug('creating timeout 2')
+                        logging.debug('creating timeout %d', error.code)
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
+                    elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND:
+                        # Cannot resolve the hostname
+                        logging.debug('Cannot resolve the hostname')
+                        raise
+                    elif error.code == Gio.IOErrorEnum.NETWORK_UNREACHABLE or \
+                            error.code == Gio.IOErrorEnum.HOST_UNREACHABLE:
+                        # Network failure (ICMP destination unreachable code)
+                        logging.debug('ICMP destination unreachable %d', error.code)
+                        raise
                     else:
                         raise
                     
@@ -791,7 +817,7 @@ class UnicornEmu(Gtk.Application):
             # Use cairo to do the matrix stuff
             self.surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.imageSize, self.imageSize)
                     
-            self.primaryMatrix = self.createNewMatrix(application.hostname, 42001, self.surface, self.builder.get_object('drawingArea'))
+            self.primaryMatrix = self.createNewMatrix(self, application.hostname, 42001, self.surface, self.builder.get_object('drawingArea'))
 
         ###############################################################################################################
         # Callbacks                

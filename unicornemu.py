@@ -379,27 +379,37 @@ class UnicornEmu(Gtk.Application):
                             error.code == Gio.IOErrorEnum.TIMED_OUT:
                         # Scratch has not responded or has refused the connection
                         # Try again in 30 seconds
-                        logging.debug('creating timeout %d', error.code)
+                        logging.debug(error.message)
+                        logging.debug('Retry connect in 30 seconds')
+                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text("%s '%s'" % (self.host, error.message))
+                        GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND or \
                             error.code == Gio.IOErrorEnum.FAILED: # Gtk seems to return zero for host not found
                         # Cannot resolve the hostname
-                        logging.debug('Cannot resolve the hostname')
-                        dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
-                        dialog.run()
-                        self.window.close()
+                        logging.debug(error.message)
+                        logging.debug('Retry connect in 30 seconds')
+                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text("%s '%s'" % (self.host, error.message))
+                        GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.NETWORK_UNREACHABLE or \
                             error.code == Gio.IOErrorEnum.HOST_UNREACHABLE:
                         # Network failure (ICMP destination unreachable code)
-                        logging.debug('ICMP destination unreachable %d', error.code)
-                        raise
+                        logging.debug(error.message)
+                        logging.debug('creating timeout %d', error.code)
+                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (%s)' % (self.host, error.message))
+                        GLib.timeout_add_seconds(30, self.retry_connect)
+                        return
                     else:
                         logging.debug("connect callback code %d domain '%s' message '%s'", error.code, error.domain, error.message)
-                        raise
+                        dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
+                        dialog.run()
+                        self.window.close()
+                        return
                     
                 if self.socketConnection != None:
                     logging.debug('Connected at first attempt')
+                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connected)' % self.host)
                     self.inputStream = self.socketConnection.get_input_stream()
                     # Start read scratch messages
                     self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
@@ -410,28 +420,41 @@ class UnicornEmu(Gtk.Application):
                 try:
                     self.socketConnection = self.socketClient.connect_to_host_finish(res)
                 except GLib.Error, error:
-                    logging.debug("timer callback code %d domain '%s' message' %s'", error.code, error.domain, error.message)
                     if error.code == Gio.IOErrorEnum.CONNECTION_REFUSED or \
                             error.code == Gio.IOErrorEnum.TIMED_OUT:
                         # Scratch has not responded or has refused the connection
                         # Try again in 30 seconds
-                        logging.debug('creating timeout %d', error.code)
+                        logging.debug(error.message)
+                        logging.debug('Retry connect in 30 seconds')
+                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (%s)' % (self.host, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
-                    elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND:
+                    elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND or \
+                            error.code == Gio.IOErrorEnum.FAILED: # Gtk seems to return zero for host not found
                         # Cannot resolve the hostname
-                        logging.debug('Cannot resolve the hostname')
-                        raise
+                        logging.debug(error.message)
+                        logging.debug('Retry connect in 30 seconds')
+                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (%s)' % (self.host, error.message))
+                        GLib.timeout_add_seconds(30, self.retry_connect)
+                        return
                     elif error.code == Gio.IOErrorEnum.NETWORK_UNREACHABLE or \
                             error.code == Gio.IOErrorEnum.HOST_UNREACHABLE:
                         # Network failure (ICMP destination unreachable code)
-                        logging.debug('ICMP destination unreachable %d', error.code)
-                        raise
+                        logging.debug(error.message)
+                        logging.debug('creating timeout %d', error.code)
+                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (%s)' % (self.host, error.message))
+                        GLib.timeout_add_seconds(30, self.retry_connect)
+                        return
                     else:
-                        raise
+                        logging.debug("connect callback code %d domain '%s' message '%s'", error.code, error.domain, error.message)
+                        dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
+                        dialog.run()
+                        self.window.close()
+                        return
                     
                 if self.socketConnection:
                     logging.debug('Connected after a retry')
+                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connected)' % self.host)
                     self.inputStream = self.socketConnection.get_input_stream()
                     self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
                 else:
@@ -811,7 +834,7 @@ class UnicornEmu(Gtk.Application):
                 title = socket.gethostname()
             else:
                 title = application.hostname
-            self.builder.get_object('unicornemuMainMatrixLabel').set_text(title)
+            self.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (not connected)' % title)
             self.mainWindow.show()
             
             # Use cairo to do the matrix stuff

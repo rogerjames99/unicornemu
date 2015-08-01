@@ -317,7 +317,7 @@ class UnicornEmu(Gtk.Application):
     # Local classes
     ###############################################################################################################
  
-    class Window(object):
+    class MyWindow(object):
         
         ###############################################################################################################
         # Local classes
@@ -415,7 +415,7 @@ class UnicornEmu(Gtk.Application):
                     self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
                 else:
                     logging.debug('should not get here 1')
-                    
+
             def connect_to_host_async_timer_callback(self, source_object, res, user_data):
                 try:
                     self.socketConnection = self.socketClient.connect_to_host_finish(res)
@@ -465,16 +465,20 @@ class UnicornEmu(Gtk.Application):
                 try:
                     scratch_message = self.inputStream.read_bytes_finish(res)
                 except GLib.Error, error:
-                    logging.debug("code %d domain '%s' message '%s'", error.code, error.domain, error.message)
-                    raise
+                        dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
+                        dialog.run()
+                        self.window.close()
+                        return
                 
                 if scratch_message.get_size() != self.scratch_message_length:
                     # I assume the connection is broken in some way so close it and start again
                     # May need to rethink this if I see fragmentation
                     logging.debug('Reconnecting')
                     self.socketConnection.close()
+                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connection lost)' % self.host)
                     self.socketClient = Gio.SocketClient.new()
                     GLib.timeout_add_seconds(30, self.retry_connect)
+                    return
                 
                 logging.debug("Scratch message '%s'", scratch_message.get_data())
 
@@ -489,15 +493,19 @@ class UnicornEmu(Gtk.Application):
                 try:
                     count_bytes = self.inputStream.read_bytes_finish(res)
                 except GLib.Error, error:
-                    logging.debug("code %d domain '%s' message '%s'", error.code, error.domain, error.message)
-                    raise
+                        dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
+                        dialog.run()
+                        self.window.close()
+                        return
                 
                 if count_bytes.get_size() != 4:
                     # I assume the connection is broken in some way so close it and start again
                     logging.debug('Reconnecting')
-                    self.socketCOnnection.close()
-                    socketClient = Gio.SocketClient.new()
-                    socketClient.connect_to_host_async(host, port, None, self.connect_to_host_async_callback, None)
+                    self.socketConnection.close()
+                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connection lost)' % self.host)
+                    self.socketClient = Gio.SocketClient.new()
+                    GLib.timeout_add_seconds(30, self.retry_connect)
+                    return
                 
                 self.scratch_message_length = struct.unpack('>L', count_bytes.get_data())[0]
                 
@@ -583,7 +591,7 @@ class UnicornEmu(Gtk.Application):
 
                 if(paintColour[0] >= 0.):
                     self.lastColour = paintColour
-                
+            
             def setComponent(self, component, parameters):
                 logging.debug('setComponent component: %s parameters %s', component, parameters)
                 if component == 'red':
@@ -612,7 +620,7 @@ class UnicornEmu(Gtk.Application):
                 else:
                     logging.debug('setComponent invalid colour')
 
-            def matrixuse(slef):
+            def matrixuse(self):
                 logging.debug('matrixuse')
                 
             def alloff(self):
@@ -791,7 +799,7 @@ class UnicornEmu(Gtk.Application):
                         logging.debug('Row command badly formatted - bad colour')
                 else:
                     logging.debug('Row command badly formatted %s %s %d', command[0], command[1:], len(command[1:]))
-
+            
             def col(self, command):
                 logging.debug('col')
                 if command[0].isdigit() and int(command[0]) > 0 and int(command[0]) < 9 and command[1:].isalpha() and len(command[1:]) == 8:
@@ -809,7 +817,7 @@ class UnicornEmu(Gtk.Application):
                         logging.debug('Col command badly formatted - bad colour')
                 else:
                     logging.debug('Col command badly formatted %s %s %d', command[0], command[1:], len(command[1:]))
-
+            
         ###############################################################################################################
         # Initialisation
         ###############################################################################################################
@@ -915,7 +923,7 @@ class UnicornEmu(Gtk.Application):
     ###############################################################################################################
         
     def activate_callback(self, *args):
-        self.Window(self, self.hostname)
+        self.MyWindow(self, self.hostname)
 
     def browserCallback(self, proxy, sender, signal, args):
         if signal == 'ItemNew':
@@ -1024,7 +1032,6 @@ class UnicornEmu(Gtk.Application):
         else:
             logging.debug('Should never see this')
             Application.release()
-
                                             
     def new_browser_proxy_callback(self, source_object, res, user_data):
         self.avahibrowser = Gio.DBusProxy.new_finish(res)

@@ -12,7 +12,6 @@ import time
 import struct
 import avahi
 import avahi
-import socket
 
 # Node definitions for accessing Avahi via DBUS
 
@@ -343,6 +342,10 @@ class UnicornEmu(Gtk.Application):
                             'w': (1, 1, 1), 'white': (1, 1, 1), '0': (0, 0, 0), 'off': (0, 0, 0), '1': (1, 1, 1), 'on': (1, 1, 1),
                             'z': (0, 0, 0), 'invert': (0, 0, 0), 'random' : (0,0,0)}
                 self.lastColour = (0,0,0)
+                if host == 'localhost':
+                    self.title = GLib.get_host_name()
+                else:
+                    self.title = host
 
                 logging.debug('Surface matrix')
                 self.context.scale(float(self.surface.get_width()) / self.hatSize, -float(self.surface.get_height()) / self.hatSize)
@@ -358,7 +361,7 @@ class UnicornEmu(Gtk.Application):
                 self.update()
                 
                 # Connect to scratch
-                self.socketClient = Gio.SocketClient.new() # Kepp this hanging abput if case of time outs etc.
+                self.socketClient = Gio.SocketClient.new() # Keep this hanging about in case of time outs etc.
                 logging.debug('Started connection process %d', GLib.get_monotonic_time())
                 self.socketClient.connect_to_host_async(host, port, None, self.connect_to_host_async_callback, None)
                 
@@ -381,7 +384,7 @@ class UnicornEmu(Gtk.Application):
                         # Try again in 30 seconds
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text("%s '%s'" % (self.host, error.message))
+                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text("%s '%s'" % (self.title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND or \
@@ -389,7 +392,7 @@ class UnicornEmu(Gtk.Application):
                         # Cannot resolve the hostname
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text("%s '%s'" % (self.host, error.message))
+                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text("%s '%s'" % (self.title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.NETWORK_UNREACHABLE or \
@@ -397,7 +400,7 @@ class UnicornEmu(Gtk.Application):
                         # Network failure (ICMP destination unreachable code)
                         logging.debug(error.message)
                         logging.debug('creating timeout %d', error.code)
-                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (%s)' % (self.host, error.message))
+                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (%s)' % (self.title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     else:
@@ -409,7 +412,7 @@ class UnicornEmu(Gtk.Application):
                     
                 if self.socketConnection != None:
                     logging.debug('Connected at first attempt')
-                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connected)' % self.host)
+                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connected)' % self.title)
                     self.inputStream = self.socketConnection.get_input_stream()
                     # Start read scratch messages
                     self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
@@ -426,7 +429,7 @@ class UnicornEmu(Gtk.Application):
                         # Try again in 30 seconds
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (%s)' % (self.host, error.message))
+                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (%s)' % (self.title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND or \
@@ -434,7 +437,7 @@ class UnicornEmu(Gtk.Application):
                         # Cannot resolve the hostname
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (%s)' % (self.host, error.message))
+                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (%s)' % (self.title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.NETWORK_UNREACHABLE or \
@@ -442,7 +445,7 @@ class UnicornEmu(Gtk.Application):
                         # Network failure (ICMP destination unreachable code)
                         logging.debug(error.message)
                         logging.debug('creating timeout %d', error.code)
-                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (%s)' % (self.host, error.message))
+                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (%s)' % (self.title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     else:
@@ -454,7 +457,7 @@ class UnicornEmu(Gtk.Application):
                     
                 if self.socketConnection:
                     logging.debug('Connected after a retry')
-                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connected)' % self.host)
+                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connected)' % self.title)
                     self.inputStream = self.socketConnection.get_input_stream()
                     self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
                 else:
@@ -475,7 +478,7 @@ class UnicornEmu(Gtk.Application):
                     # May need to rethink this if I see fragmentation
                     logging.debug('Reconnecting')
                     self.socketConnection.close()
-                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connection lost)' % self.host)
+                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connection lost)' % self.title)
                     self.socketClient = Gio.SocketClient.new()
                     GLib.timeout_add_seconds(30, self.retry_connect)
                     return
@@ -502,7 +505,7 @@ class UnicornEmu(Gtk.Application):
                     # I assume the connection is broken in some way so close it and start again
                     logging.debug('Reconnecting')
                     self.socketConnection.close()
-                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connection lost)' % self.host)
+                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connection lost)' % self.title)
                     self.socketClient = Gio.SocketClient.new()
                     GLib.timeout_add_seconds(30, self.retry_connect)
                     return
@@ -825,21 +828,26 @@ class UnicornEmu(Gtk.Application):
         def __init__(self, application, *args):
             # Constants
             self.imageSize = 1000
+            self.localHostname = GLib.get_host_name()
 
             # Set up the gui                     
+            '''
             self.builder = Gtk.Builder()
             
             try:
                 self.builder.add_from_file(os.path.join('/usr/share/unicornemu', 'unicornemu.ui'))
             except GLib.Error:
                 self.builder.add_from_file(os.path.join(os.getcwd(), 'unicornemu.ui'))
-                
+            '''
+            
+            self.builder = Gtk.Builder.new_from_resource('/uk/co/beardandsandals/UnicornEmu/unicornemu.ui')    
             self.builder.connect_signals(self)
             self.mainWindow = self.builder.get_object('unicornemuApplicationWindow')
             self.mainWindow.set_application(application)
             if application.hostname == 'localhost':
                 # Get real hostname
-                title = socket.gethostname()
+                title = self.localHostname
+                logging.debug('Local hostname %s', title)
             else:
                 title = application.hostname
             self.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (not connected)' % title)
@@ -849,6 +857,10 @@ class UnicornEmu(Gtk.Application):
             self.surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.imageSize, self.imageSize)
                     
             self.primaryMatrix = self.createNewMatrix(self, application.hostname, 42001, self.surface, self.builder.get_object('drawingArea'))
+            
+            # Start the process of connecting to Avahi
+            if application.avahiSupport:
+                Gio.bus_get(Gio.BusType.SYSTEM, None, self.bus_get_callback, None)
 
         ###############################################################################################################
         # Callbacks                
@@ -859,12 +871,151 @@ class UnicornEmu(Gtk.Application):
             logging.shutdown()
             self.close()
 
+        def browserCallback(self, proxy, sender, signal, args):
+            if signal == 'ItemNew':
+                '''
+                <signal name="ItemNew">
+                  <arg name="interface" type="i"/>
+                  <arg name="protocol" type="i"/>
+                  <arg name="name" type="s"/>
+                  <arg name="type" type="s"/>
+                  <arg name="domain" type="s"/>
+                  <arg name="flags" type="u"/>
+                </signal>
+                '''
+                
+                '''
+                <method name="ResolveService">
+                  <arg name="interface" type="i" direction="in"/>
+                  <arg name="protocol" type="i" direction="in"/>
+                  <arg name="name" type="s" direction="in"/>
+                  <arg name="type" type="s" direction="in"/>
+                  <arg name="domain" type="s" direction="in"/>
+                  <arg name="aprotocol" type="i" direction="in"/>
+                  <arg name="flags" type="u" direction="in"/>
+
+                  <arg name="interface" type="i" direction="out"/>
+                  <arg name="protocol" type="i" direction="out"/>
+                  <arg name="name" type="s" direction="out"/>
+                  <arg name="type" type="s" direction="out"/>
+                  <arg name="domain" type="s" direction="out"/>
+                  <arg name="host" type="s" direction="out"/>
+                  <arg name="aprotocol" type="i" direction="out"/>
+                  <arg name="address" type="s" direction="out"/>
+                  <arg name="port" type="q" direction="out"/>
+                  <arg name="txt" type="aay" direction="out"/>
+                  <arg name="flags" type="u" direction="out"/>
+                </method>
+                '''
+                returns = self.avahiserver.ResolveService('(iisssiu)',
+                        args[0], # Interface
+                        args[1], # Protocol
+                        args[2], # Name
+                        args[3], # Service Type 
+                        args[4], # Domain
+                        avahi.PROTO_UNSPEC, # aprotocol 
+                        0) # flags
+                logging.debug("Found service - name '%s\ntype '%s\ndomain '%s'\nhost '%s'\naprotocol %d\nip-address '%s'\nport number #%d", \
+                        returns[2], returns[3], returns[4], returns[5], returns[6], returns[7], returns[8])
+                        
+                hostname = returns[5]
+                portnumber = int(returns[8])
+                        
+                if hostname.split('.')[0] != self.localHostname: 
+                    self.create_new_thumbnail(hostname, portnumber)
+            elif signal == 'ItemRemove':
+                '''
+                <signal name="ItemRemove"
+                  <arg name="interface" type="i"/>
+                  <arg name="protocol" type="i"/>
+                  <arg name="name" type="s"/>
+                  <arg name="type" type="s"/>
+                  <arg name="domain" type="s"/>
+                  <arg name="flags" type="u"/>
+                </signal>
+                '''
+                logging.debug('ItemRemoved ignored')
+            elif signal == 'Failure':
+                '''
+                <signal name="Failure">
+                  <arg name="error" type="s"/>
+                </signal>
+                '''
+                logging.debug('Failure ignored')
+            elif signal == 'AllForNow':
+                '''
+                <signal name="AllForNow"/>
+                '''
+                logging.debug('AllForNow ignored')
+            elif signal == 'CacheExhausted':
+                '''
+                <signal name="CacheExhausted"/>
+                '''
+                logging.debug('CacheExhausted ignored')
+            else:
+                logging.debug("ignoring signal signal %s'", signal)
+            
+        def bus_get_callback(self, source_object, res, user_data):
+            self.systemDBusConnection = Gio.bus_get_finish(res)
+            
+            # Subscribe to the DBUS signal 'ItemNew' that is sent by Avahi Service Browser Objects to signal new services becoming available.
+            # Also subscribe to the 'AllForNow' signal that used to signal that nothing more is availbale.
+            # I need do this at this point because when I call the Avahi Server proxy object's ServiceBrowserNew method the new remote object
+            # will immediately send an 'ItemNew' signal for each service that is currently available. followed by a single 'AllForNow' signal.
+            # These signals often arrive before the local DBusProxy object has completed its initialisation and I have had a chane to use its
+            # connect method to hook up to its rebroadcast of DBUS signals on the GObject signalling system.
+            # I will unsubscribe these signals as soon as GObject signal has been successfully hooked up
+            self.ItemNewId = self.systemDBusConnection.signal_subscribe(None, 'org.freedesktop.Avahi.ServiceBrowser', 'ItemNew', None, 
+                                                        None, 0, self.dbus_signal_callback, None)
+            self.AllForNowId = self.systemDBusConnection.signal_subscribe(None, 'org.freedesktop.Avahi.ServiceBrowser', 'AllForNow', None, 
+                                                        None, 0, self.dbus_signal_callback, None)
+            
+            # Request a proxy for an Avahi DBUS_INTERFACE_SERVER object
+            Gio.DBusProxy.new(self.systemDBusConnection, 0, NodeInfoForServer.lookup_interface(avahi.DBUS_INTERFACE_SERVER),
+                                                avahi.DBUS_NAME,
+                                                avahi.DBUS_PATH_SERVER,
+                                                avahi.DBUS_INTERFACE_SERVER, None,
+                                                self.new_server_proxy_callback, None)
+                                                
+        def dbus_signal_callback(self, connection, sender_name, object_path, interface_name, signal_name, arguments, user_data):
+            if (signal_name == 'ItemNew') or (signal_name == 'AllForNow'):
+                # Pass the signal on to my GObject signal handler
+                self.browserCallback(None, sender_name, signal_name, arguments)
+            else:
+                logging.debug('Should never see this')
+                Application.release()
+                                                
+        def new_browser_proxy_callback(self, source_object, res, user_data):
+            self.avahibrowser = Gio.DBusProxy.new_finish(res)
+            self.avahibrowser.connect('g-signal', self.browserCallback)
+            self.systemDBusConnection.signal_unsubscribe(self.ItemNewId)
+            self.systemDBusConnection.signal_unsubscribe(self.AllForNowId)
+                   
+        def new_server_proxy_callback(self, source_object, res, user_data):
+            self.avahiserver = Gio.DBusProxy.new_finish(res)        
+            avahibrowserpath = self.avahiserver.ServiceBrowserNew('(iissu)',
+                                    avahi.IF_UNSPEC,
+                                    avahi.PROTO_INET,
+                                    '_scratch._tcp',
+                                    'local',
+                                    0)
+            
+            Gio.DBusProxy.new(self.systemDBusConnection, 0, NodeInfoForServiceBrowser.lookup_interface(avahi.DBUS_INTERFACE_SERVICE_BROWSER),
+                                                avahi.DBUS_NAME,
+                                                avahibrowserpath,
+                                                avahi.DBUS_INTERFACE_SERVICE_BROWSER, None,
+                                                self.new_browser_proxy_callback, None)
+        
         ###############################################################################################################
         # Methods            
         ###############################################################################################################
         
         def close(self, *args):
             self.mainWindow.destroy()
+            
+        def create_new_thumbnail(self, hostname, portnumber):
+            # Create a new thumbnail window for a remote scratch host
+            print 'host', host, 'port', portnumber
             
         def drawit(self, widget, cr):
             logging.debug('Draw callback')
@@ -911,12 +1062,17 @@ class UnicornEmu(Gtk.Application):
             console.setFormatter(formatter)
             logging.getLogger('').addHandler(console)
                              
-        logging.debug('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        logging.debug('Loading resources')
         
-        # Start the process of connecting to Avahi
-        if self.avahiSupport:
-            Gio.bus_get(Gio.BusType.SYSTEM, None, self.bus_get_callback, None)
+        # Load resources
+        try:
+            resources = Gio.Resource.load(os.path.join('/usr/share/unicornemu', 'unicornemu.gresource'))
+        except GLib.Error:
+            resources = Gio.Resource.load(os.path.join(os.getcwd(), 'resources/unicornemu.gresource'))
+            
+        Gio.resources_register(resources)
 
+        logging.debug('Resources loaded and registered')
         
     ###############################################################################################################
     # Callbacks                
@@ -925,135 +1081,6 @@ class UnicornEmu(Gtk.Application):
     def activate_callback(self, *args):
         self.MyWindow(self, self.hostname)
 
-    def browserCallback(self, proxy, sender, signal, args):
-        if signal == 'ItemNew':
-            '''
-            <signal name="ItemNew">
-              <arg name="interface" type="i"/>
-              <arg name="protocol" type="i"/>
-              <arg name="name" type="s"/>
-              <arg name="type" type="s"/>
-              <arg name="domain" type="s"/>
-              <arg name="flags" type="u"/>
-            </signal>
-            '''
-            
-            '''
-            <method name="ResolveService">
-              <arg name="interface" type="i" direction="in"/>
-              <arg name="protocol" type="i" direction="in"/>
-              <arg name="name" type="s" direction="in"/>
-              <arg name="type" type="s" direction="in"/>
-              <arg name="domain" type="s" direction="in"/>
-              <arg name="aprotocol" type="i" direction="in"/>
-              <arg name="flags" type="u" direction="in"/>
-
-              <arg name="interface" type="i" direction="out"/>
-              <arg name="protocol" type="i" direction="out"/>
-              <arg name="name" type="s" direction="out"/>
-              <arg name="type" type="s" direction="out"/>
-              <arg name="domain" type="s" direction="out"/>
-              <arg name="host" type="s" direction="out"/>
-              <arg name="aprotocol" type="i" direction="out"/>
-              <arg name="address" type="s" direction="out"/>
-              <arg name="port" type="q" direction="out"/>
-              <arg name="txt" type="aay" direction="out"/>
-              <arg name="flags" type="u" direction="out"/>
-            </method>
-            '''
-            returns = self.avahiserver.ResolveService('(iisssiu)',
-                    args[0], # Interface
-                    args[1], # Protocol
-                    args[2], # Name
-                    args[3], # Service Type 
-                    args[4], # Domain
-                    avahi.PROTO_UNSPEC, # aprotocol 
-                    0) # flags
-            logging.debug("Found service - name '%s\ntype '%s\ndomain '%s'\nhost '%s'\naprotocol %d\nip-address '%s'\nport number #%d", \
-                    returns[2], returns[3], returns[4], returns[5], returns[6], returns[7], returns[8])
-        elif signal == 'ItemRemove':
-            '''
-            <signal name="ItemRemove"
-              <arg name="interface" type="i"/>
-              <arg name="protocol" type="i"/>
-              <arg name="name" type="s"/>
-              <arg name="type" type="s"/>
-              <arg name="domain" type="s"/>
-              <arg name="flags" type="u"/>
-            </signal>
-            '''
-            logging.debug('ItemRemoved ignored')
-        elif signal == 'Failure':
-            '''
-            <signal name="Failure">
-              <arg name="error" type="s"/>
-            </signal>
-            '''
-            logging.debug('Failure ignored')
-        elif signal == 'AllForNow':
-            '''
-            <signal name="AllForNow"/>
-            '''
-            logging.debug('AllForNow ignored')
-        elif signal == 'CacheExhausted':
-            '''
-            <signal name="CacheExhausted"/>
-            '''
-            logging.debug('CacheExhausted ignored')
-        else:
-            logging.debug("ignoring signal signal %s'", signal)
-        
-    def bus_get_callback(self, source_object, res, user_data):
-        self.systemDBusConnection = Gio.bus_get_finish(res)
-        
-        # Subscribe to the DBUS signal 'ItemNew' that is sent by Avahi Service Browser Objects to signal new services becoming available.
-        # Also subscribe to the 'AllForNow' signal that used to signal that nothing more is availbale.
-        # I need do this at this point because when I call the Avahi Server proxy object's ServiceBrowserNew method the new remote object
-        # will immediately send an 'ItemNew' signal for each service that is currently available. followed by a single 'AllForNow' signal.
-        # These signals often arrive before the local DBusProxy object has completed its initialisation and I have had a chane to use its
-        # connect method to hook up to its rebroadcast of DBUS signals on the GObject signalling system.
-        # I will unsubscribe these signals as soon as GObject signal has been successfully hooked up
-        self.ItemNewId = self.systemDBusConnection.signal_subscribe(None, 'org.freedesktop.Avahi.ServiceBrowser', 'ItemNew', None, 
-                                                    None, 0, self.dbus_signal_callback, None)
-        self.AllForNowId = self.systemDBusConnection.signal_subscribe(None, 'org.freedesktop.Avahi.ServiceBrowser', 'AllForNow', None, 
-                                                    None, 0, self.dbus_signal_callback, None)
-        
-        # Request a proxy for an Avahi DBUS_INTERFACE_SERVER object
-        Gio.DBusProxy.new(self.systemDBusConnection, 0, NodeInfoForServer.lookup_interface(avahi.DBUS_INTERFACE_SERVER),
-                                            avahi.DBUS_NAME,
-                                            avahi.DBUS_PATH_SERVER,
-                                            avahi.DBUS_INTERFACE_SERVER, None,
-                                            self.new_server_proxy_callback, None)
-                                            
-    def dbus_signal_callback(self, connection, sender_name, object_path, interface_name, signal_name, arguments, user_data):
-        if (signal_name == 'ItemNew') or (signal_name == 'AllForNow'):
-            # Pass the signal on to my GObject signal handler
-            self.browserCallback(None, sender_name, signal_name, arguments)
-        else:
-            logging.debug('Should never see this')
-            Application.release()
-                                            
-    def new_browser_proxy_callback(self, source_object, res, user_data):
-        self.avahibrowser = Gio.DBusProxy.new_finish(res)
-        self.avahibrowser.connect('g-signal', self.browserCallback)
-        self.systemDBusConnection.signal_unsubscribe(self.ItemNewId)
-        self.systemDBusConnection.signal_unsubscribe(self.AllForNowId)
-               
-    def new_server_proxy_callback(self, source_object, res, user_data):
-        self.avahiserver = Gio.DBusProxy.new_finish(res)        
-        avahibrowserpath = self.avahiserver.ServiceBrowserNew('(iissu)',
-                                avahi.IF_UNSPEC,
-                                avahi.PROTO_INET,
-                                '_scratch._tcp',
-                                'local',
-                                0)
-        
-        Gio.DBusProxy.new(self.systemDBusConnection, 0, NodeInfoForServiceBrowser.lookup_interface(avahi.DBUS_INTERFACE_SERVICE_BROWSER),
-                                            avahi.DBUS_NAME,
-                                            avahibrowserpath,
-                                            avahi.DBUS_INTERFACE_SERVICE_BROWSER, None,
-                                            self.new_browser_proxy_callback, None)
-    
         
     ###############################################################################################################
     # Methods            

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/uk/co/beardandsandals/UnicornEmu">
+    <file compressed="true">unicornemu.ui</file>
+  </gresource>
+</gresources>
+

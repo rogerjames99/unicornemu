@@ -2,6 +2,7 @@
 <gresources>
   <gresource prefix="/uk/co/beardandsandals/UnicornEmu">
     <file compressed="true">unicornemu.ui</file>
+    <file compressed="true">remotehost.ui</file>
   </gresource>
 </gresources>
 

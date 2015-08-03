@@ -322,21 +322,31 @@ class UnicornEmu(Gtk.Application):
         # Local classes
         ###############################################################################################################
  
-        class createNewMatrix(object):
+        class MatrixDisplay(object):
 
             ###############################################################################################################
             # Initialisation
             ###############################################################################################################
  
-            def __init__(self, window, host, port, surface, drawingArea):
-                logging.debug('Creating new creatNewMatrix object')
-                self.window = window
+            def __init__(self, host, port, container):
+                logging.debug('Creating new MatrixDisplay object')
+                
+                self.hatSize = 8
+                self.imageSize = 1000
                 self.host = host
                 self.port = port
-                self.surface = surface
+                
+                # Use cairo to do the matrix stuff
+                self.surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.imageSize, self.imageSize)
                 self.context = cairo.Context(self.surface)
-                self.drawingArea = drawingArea
-                self.hatSize = 8
+                
+                #TODO window creation and hooking into current container
+                builder = Gtk.Builder.new_from_resource('/uk/co/beardandsandals/UnicornEmu/remotehost.ui')    
+                builder.connect_signals(self)
+                self.frame = builder.get_object('unicornemuRemoteHost')
+                self.drawingArea = builder.get_object('drawingArea')
+                    
+
                 self.tcolours = {'r': (1, 0, 0), 'red': (1, 0, 0), 'g': (0, 1, 0), 'green': (0, 1, 0), 'b': (0, 0, 1), 'blue': (0, 0, 1),
                             'c': (0, 1, 1), 'cyan': (0, 1, 1), 'm': (1, 0, 1), 'magenta': (1, 0, 1), 'y': (1, 1, 0), 'yellow': (1, 1, 0),
                             'w': (1, 1, 1), 'white': (1, 1, 1), '0': (0, 0, 0), 'off': (0, 0, 0), '1': (1, 1, 1), 'on': (1, 1, 1),
@@ -344,8 +354,10 @@ class UnicornEmu(Gtk.Application):
                 self.lastColour = (0,0,0)
                 if host == 'localhost':
                     self.title = GLib.get_host_name()
+                    container.pack_end(self.frame, False, False, 0)
                 else:
                     self.title = host
+                    container.pack_start(self.frame)
 
                 logging.debug('Surface matrix')
                 self.context.scale(float(self.surface.get_width()) / self.hatSize, -float(self.surface.get_height()) / self.hatSize)
@@ -370,9 +382,6 @@ class UnicornEmu(Gtk.Application):
             # Callbacks                
             ###############################################################################################################
             
-            def notify_callback(self):
-                pass
-            
             def connect_to_host_async_callback(self, source_object, res, user_data):
                 logging.debug( 'async_callback %d', GLib.get_monotonic_time())
                 try:
@@ -384,7 +393,7 @@ class UnicornEmu(Gtk.Application):
                         # Try again in 30 seconds
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text("%s '%s'" % (self.title, error.message))
+                        self.frame.set_label("%s '%s'" % (self.title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND or \
@@ -392,7 +401,7 @@ class UnicornEmu(Gtk.Application):
                         # Cannot resolve the hostname
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text("%s '%s'" % (self.title, error.message))
+                        self.frame.set_label("%s '%s'" % (self.title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.NETWORK_UNREACHABLE or \
@@ -400,7 +409,7 @@ class UnicornEmu(Gtk.Application):
                         # Network failure (ICMP destination unreachable code)
                         logging.debug(error.message)
                         logging.debug('creating timeout %d', error.code)
-                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (%s)' % (self.title, error.message))
+                        self.frame.set_label('%s (%s)' % (self.title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     else:
@@ -412,7 +421,7 @@ class UnicornEmu(Gtk.Application):
                     
                 if self.socketConnection != None:
                     logging.debug('Connected at first attempt')
-                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connected)' % self.title)
+                    self.frame.set_label('%s (connected)' % self.title)
                     self.inputStream = self.socketConnection.get_input_stream()
                     # Start read scratch messages
                     self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
@@ -429,7 +438,7 @@ class UnicornEmu(Gtk.Application):
                         # Try again in 30 seconds
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (%s)' % (self.title, error.message))
+                        self.frame.set_label('%s (%s)' % (self.title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND or \
@@ -437,7 +446,7 @@ class UnicornEmu(Gtk.Application):
                         # Cannot resolve the hostname
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (%s)' % (self.title, error.message))
+                        self.frame.set_label('%s (%s)' % (self.title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.NETWORK_UNREACHABLE or \
@@ -445,7 +454,7 @@ class UnicornEmu(Gtk.Application):
                         # Network failure (ICMP destination unreachable code)
                         logging.debug(error.message)
                         logging.debug('creating timeout %d', error.code)
-                        self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (%s)' % (self.title, error.message))
+                        self.frame.set_label('%s (%s)' % (self.title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     else:
@@ -457,12 +466,26 @@ class UnicornEmu(Gtk.Application):
                     
                 if self.socketConnection:
                     logging.debug('Connected after a retry')
-                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connected)' % self.title)
+                    self.frame.set_label('%s (connected)' % self.title)
                     self.inputStream = self.socketConnection.get_input_stream()
                     self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
                 else:
                     logging.debug('should not get here 2')
                 
+            def drawMatrix(self, widget, cr):
+                logging.debug('Draw callback')
+                x ,y, width, height = cr.clip_extents()
+                xscale = float(width) / float(self.surface.get_width())
+                yscale = float(height) / float(self.surface.get_height())
+                cr.scale(xscale, yscale)
+                cr.set_operator(cairo.OPERATOR_SOURCE)
+                cr.set_source_surface(self.surface)
+                cr.paint()
+                return False
+            
+            def notify_callback(self):
+                pass
+            
             def read_scratch_message_content_callback(self, source_object, res, user_data):
                 logging.debug('read_scratch_message_content_callback')
                 try:
@@ -630,13 +653,13 @@ class UnicornEmu(Gtk.Application):
                 logging.debug('alloff')
                 self.context.set_source_rgb(0, 0, 0)
                 self.context.paint()
-                GLib.idle_add(self.update)
+                self.update()
                 
             def allon(self):
                 logging.debug('allon')
                 self.context.set_source_rgb(1, 1, 1)
                 self.context.paint()
-                GLib.idle_add(self.update)
+                self.update()
                 
             def sweep(self):
                 logging.debug('sweep')
@@ -645,7 +668,7 @@ class UnicornEmu(Gtk.Application):
                         self.context.set_source_rgba(random.random(), random.random(), random.random())
                         self.context.rectangle(x, y, 1, 1)
                         self.context.fill()
-                        GLib.idle_add(self.update)
+                        self.update()
                         time.sleep(0.05)
             
             def move(self, command):
@@ -701,7 +724,7 @@ class UnicornEmu(Gtk.Application):
                 else:
                     return
                                 
-                GLib.idle_add(self.update)
+                self.update()
             
             def processColour(self, colour):  
                 paintColour = (-1, 0, 0)
@@ -783,7 +806,7 @@ class UnicornEmu(Gtk.Application):
                     self.context.set_source_rgba(self.lastColour[0], self.lastColour[1], self.lastColour[2])
                     self.context.rectangle(col, row, 1, 1)
                     self.context.fill()
-                    GLib.idle_add(self.update)
+                    self.update()
             
             def row(self, command):
                 logging.debug('row')
@@ -797,7 +820,7 @@ class UnicornEmu(Gtk.Application):
                         else:
                             break
                     if col == self.hatSize:
-                        GLib.idle_add(self.update)
+                        self.update()
                     else:
                         logging.debug('Row command badly formatted - bad colour')
                 else:
@@ -815,7 +838,7 @@ class UnicornEmu(Gtk.Application):
                         else:
                             break
                     if row == self.hatSize:
-                        GLib.idle_add(self.update)
+                        self.update()
                     else:
                         logging.debug('Col command badly formatted - bad colour')
                 else:
@@ -827,36 +850,16 @@ class UnicornEmu(Gtk.Application):
  
         def __init__(self, application, *args):
             # Constants
-            self.imageSize = 1000
             self.localHostname = GLib.get_host_name()
 
-            # Set up the gui                     
-            '''
-            self.builder = Gtk.Builder()
-            
-            try:
-                self.builder.add_from_file(os.path.join('/usr/share/unicornemu', 'unicornemu.ui'))
-            except GLib.Error:
-                self.builder.add_from_file(os.path.join(os.getcwd(), 'unicornemu.ui'))
-            '''
-            
+            # Set up the gui                                 
             self.builder = Gtk.Builder.new_from_resource('/uk/co/beardandsandals/UnicornEmu/unicornemu.ui')    
             self.builder.connect_signals(self)
-            self.mainWindow = self.builder.get_object('unicornemuApplicationWindow')
-            self.mainWindow.set_application(application)
-            if application.hostname == 'localhost':
-                # Get real hostname
-                title = self.localHostname
-                logging.debug('Local hostname %s', title)
-            else:
-                title = application.hostname
-            self.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (not connected)' % title)
-            self.mainWindow.show()
+            mainWindow = self.builder.get_object('unicornemuApplicationWindow')
+            mainWindow.set_application(application)
+            mainWindow.show()
             
-            # Use cairo to do the matrix stuff
-            self.surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.imageSize, self.imageSize)
-                    
-            self.primaryMatrix = self.createNewMatrix(self, application.hostname, 42001, self.surface, self.builder.get_object('drawingArea'))
+            self.primaryMatrix = self.MatrixDisplay(application.hostname, 42001, self.builder.get_object('unicormEmuLocalDisplayBox'))
             
             # Start the process of connecting to Avahi
             if application.avahiSupport:
@@ -865,11 +868,6 @@ class UnicornEmu(Gtk.Application):
         ###############################################################################################################
         # Callbacks                
         ###############################################################################################################
-
-        def quit_cb(self, *args):
-            logging.debug('Shutting down')
-            logging.shutdown()
-            self.close()
 
         def browserCallback(self, proxy, sender, signal, args):
             if signal == 'ItemNew':
@@ -1006,27 +1004,18 @@ class UnicornEmu(Gtk.Application):
                                                 avahi.DBUS_INTERFACE_SERVICE_BROWSER, None,
                                                 self.new_browser_proxy_callback, None)
         
+        def quit_cb(self, *args):
+            logging.debug('Shutting down')
+            logging.shutdown()
+
         ###############################################################################################################
         # Methods            
         ###############################################################################################################
         
-        def close(self, *args):
-            self.mainWindow.destroy()
-            
         def create_new_thumbnail(self, hostname, portnumber):
             # Create a new thumbnail window for a remote scratch host
             print 'host', host, 'port', portnumber
             
-        def drawit(self, widget, cr):
-            logging.debug('Draw callback')
-            x ,y, width, height = cr.clip_extents()
-            xscale = float(width) / float(self.surface.get_width())
-            yscale = float(height) / float(self.surface.get_height())
-            cr.scale(xscale, yscale)
-            cr.set_operator(cairo.OPERATOR_SOURCE)
-            cr.set_source_surface(self.surface)
-            cr.paint()
-            return False
                             
     ###############################################################################################################
     # Initialisation

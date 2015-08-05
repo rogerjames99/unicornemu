@@ -1,0 +1,2 @@
+#!/usr/bin/env sh
+glib-compile-resources --target unicornemu.gresource unicornemu.resources

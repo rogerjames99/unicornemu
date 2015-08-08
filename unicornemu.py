@@ -877,8 +877,7 @@ class UnicornEmu(Gtk.Application):
             self.localHostname = GLib.get_host_name()
             
             # Local variables
-            self.avahiServiceCache = {} # indexed by avahi cache number
-            self.thumbnailMatrixDisplays = {} # indexed by hostname
+            self.avahiToThumbnailMap = {} # indexed by avahi domain and name
             
             # Set up the gui                                 
             self.builder = Gtk.Builder.new_from_resource('/uk/co/beardandsandals/UnicornEmu/unicornemu.ui')    
@@ -901,7 +900,7 @@ class UnicornEmu(Gtk.Application):
             if signal == 'ItemNew':
                 '''
                 <signal name="ItemNew">
-                  <arg name="interface" type="i"/>   # RFJ This is actaully a unique number identfying the entry in the browsers cache
+                  <arg name="interface" type="i"/>   
                   <arg name="protocol" type="i"/>
                   <arg name="name" type="s"/>
                   <arg name="type" type="s"/>
@@ -909,7 +908,7 @@ class UnicornEmu(Gtk.Application):
                   <arg name="flags" type="u"/>
                 </signal>
                 '''
-                cacheNumber = args[0]
+                interface = args[0] # The 
                 protocol = args[1]
                 name = args[2]
                 service_type = args[3]
@@ -917,9 +916,9 @@ class UnicornEmu(Gtk.Application):
                 flags = args[5]
                 
                 logging.debug("ItemNew -\ncacheNumber %d\nprotocol %d\nname '%s'\ntype '%s'\ndomain '%s'\nflags 0x%X", \
-                            cacheNumber, protocol, name, service_type, domain, flags)
+                            interface, protocol, name, service_type, domain, flags)
                             
-                if cacheNumber in self.avahiServiceCache:
+                if (domain, name) in self.avahiToThumbnailMap:
                     # ignore this for the time being - more work needed to handle service detail changes
                     logging.debug("Ignoring avahi entry already in cache")
                     return
@@ -948,13 +947,13 @@ class UnicornEmu(Gtk.Application):
                 </method>
                 '''
                 try:
-                    returns = self.avahiserver.ResolveService('(iisssiu)', cacheNumber, protocol, name, service_type,
+                    returns = self.avahiserver.ResolveService('(iisssiu)', interface, protocol, name, service_type,
                                                                         domain, avahi.PROTO_INET, 0)
                 except GLib.Error, error:
                     logging.debug("Error on ResolveService method call -- code %d message '%s'", error.code, error.message)
                     return
                                                                         
-                resolved_cacheNumber = args[0]
+                resolved_interface = args[0]
                 resolved_protocol = args[1]
                 resolved_name = args[2]
                 resolved_service_type = args[3]
@@ -965,19 +964,16 @@ class UnicornEmu(Gtk.Application):
                 portnumber = int(returns[8])
                 txt = returns[9]
                 resolved_flags = returns[10]
-                logging.debug("Found service -\nresolved_cacheNumber %d\nresolved_protocol %d\nresolved_name '%s\n"
+                logging.debug("Found service -\nresolved_interface %d\nresolved_protocol %d\nresolved_name '%s\n"
                                 "resolved_service_type '%s'\nresolved_domain '%s'\n"
                                 "hostname '%s\n' aprotocol %d\naddress '%s'\n"
                                 "portnumber 0x%X\ntxt '%s'\nresolved_flags 0x%X", \
-                            resolved_cacheNumber, resolved_protocol, resolved_name, resolved_service_type,  resolved_domain, \
+                            resolved_interface, resolved_protocol, resolved_name, resolved_service_type,  resolved_domain, \
                             hostname, aprotocol, address, portnumber, txt, resolved_flags)
                                         
-                 # Cache the result indexed by the cache number
-                self.avahiServiceCache[resolved_cacheNumber] = (hostname, address, portnumber)
-                       
                 if hostname.split('.')[0] != self.localHostname: 
                     logging.debug("Creating thumbnail for remote host '%s'", hostname)
-                    self.create_new_thumbnail(resolved_cacheNumber, hostname, address, portnumber)
+                    self.create_new_thumbnail(resolved_domain, resolved_name, hostname, address, portnumber)
                     
             elif signal == 'ItemRemove':
                 '''
@@ -990,7 +986,7 @@ class UnicornEmu(Gtk.Application):
                   <arg name="flags" type="u"/>
                 </signal>
                 '''
-                cacheNumber = args[0]
+                interface = args[0]
                 protocol = args[1]
                 name = args[2]
                 service_type = args[3]
@@ -998,13 +994,13 @@ class UnicornEmu(Gtk.Application):
                 flags = args[5]
                 
                 logging.debug("ItemRemove -\ncacheNumber %d\nprotocol %d\nname '%s'\ntype '%s'\ndomain '%s'\nflags 0x%X", \
-                            cacheNumber, protocol, name, service_type, domain, flags)
+                            interface, protocol, name, service_type, domain, flags)
                 
-                if cacheNumber in self.avahiServiceCache:
-                    del self.avahiServiceCache[cacheNumber]
-                    logging.debug("KIll the wabbit")
+                if (domain, name) in self.avahiToThumbnailMap:
+                    del self.avahiToThumbnailMap[(domain, name)]
+                    logging.debug("Kill the wabbit")
                 else:
-                    logging.debug("cacheNumber %d not in my cache", cacheNumber)
+                    logging.debug("domain '%s' name '%s' not in my cache", domain, name)
             elif signal == 'Failure':
                 '''
                 <signal name="Failure">
@@ -1084,12 +1080,12 @@ class UnicornEmu(Gtk.Application):
         # Methods            
         ###############################################################################################################
         
-        def create_new_thumbnail(self, index, hostname, address, portnumber):
+        def create_new_thumbnail(self, avahiDomain, avahiName, hostname, address, portnumber):
             # If this is a new host then create thumbnail
             # For the time being this means I will ignore calls for multiple ports on the same host
-            if not hostname in self.thumbnailMatrixDisplays:
+            if not (avahiDomain, avahiName) in self.avahiToThumbnailMap:
                 # Create a new thumbnail window for a remote scratch host
-                self.thumbnailMatrixDisplays[hostname] = (index, self.MatrixDisplay(hostname, address, portnumber, self.builder.get_object('unicormEmuLocalDisplayBox')))
+                self.avahiToThumbnailMap[(avahiDomain, avahiName)] = self.MatrixDisplay(hostname, address, portnumber, self.builder.get_object('unicormEmuLocalDisplayBox'))
                 
         def destroy_thumbnail(self, hostname, portnumber):
             pass

@@ -974,6 +974,7 @@ class UnicornEmu(Gtk.Application):
                 if hostname.split('.')[0] != self.localHostname: 
                     logging.debug("Creating thumbnail for remote host '%s'", hostname)
                     self.create_new_thumbnail(resolved_domain, resolved_name, hostname, address, portnumber)
+
                     
             elif signal == 'ItemRemove':
                 '''
@@ -993,14 +994,15 @@ class UnicornEmu(Gtk.Application):
                 domain = args[4]
                 flags = args[5]
                 
-                logging.debug("ItemRemove -\ncacheNumber %d\nprotocol %d\nname '%s'\ntype '%s'\ndomain '%s'\nflags 0x%X", \
+                logging.debug("ItemRemove -\ninterface %d\nprotocol %d\nname '%s'\ntype '%s'\ndomain '%s'\nflags 0x%X", \
                             interface, protocol, name, service_type, domain, flags)
                 
                 if (domain, name) in self.avahiToThumbnailMap:
-                    del self.avahiToThumbnailMap[(domain, name)]
                     logging.debug("Kill the wabbit")
+                    self.destroy_thumbnail(domain, name)
                 else:
                     logging.debug("domain '%s' name '%s' not in my cache", domain, name)
+                    
             elif signal == 'Failure':
                 '''
                 <signal name="Failure">
@@ -1086,9 +1088,13 @@ class UnicornEmu(Gtk.Application):
             if not (avahiDomain, avahiName) in self.avahiToThumbnailMap:
                 # Create a new thumbnail window for a remote scratch host
                 self.avahiToThumbnailMap[(avahiDomain, avahiName)] = self.MatrixDisplay(hostname, address, portnumber, self.builder.get_object('unicormEmuLocalDisplayBox'))
+                logging.debug("Thumbnail map after add '%s'", self.avahiToThumbnailMap)
                 
-        def destroy_thumbnail(self, hostname, portnumber):
-            pass
+        def destroy_thumbnail(self, avahiDomain, avahiName):
+            logging.debug("Thumbnail map before delete'%s'", self.avahiToThumbnailMap)
+            matrixDisplay = self.avahiToThumbnailMap[(avahiDomain, avahiName)]
+            matrixDisplay.frame.destroy()
+            del self.avahiToThumbnailMap[(avahiDomain, avahiName)] # I am hoping that this detroys the MatrixDisplay object
 
     ###############################################################################################################
     # Initialisation

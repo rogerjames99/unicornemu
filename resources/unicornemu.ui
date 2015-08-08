@@ -3,6 +3,7 @@
 <interface>
   <requires lib="gtk+" version="3.10"/>
   <object class="GtkApplicationWindow" id="unicornemuApplicationWindow">
+    <property name="sensitive">False</property>
     <property name="can_focus">False</property>
     <property name="title" translatable="yes">Unicorn Hat Emulator</property>
     <property name="window_position">center</property>
@@ -11,17 +12,17 @@
     <child>
       <object class="GtkBox" id="unicormEmuLocalDisplayBox">
         <property name="visible">True</property>
+        <property name="sensitive">False</property>
         <property name="can_focus">False</property>
+        <property name="halign">start</property>
+        <property name="valign">start</property>
         <child>
           <object class="GtkBox" id="unicornEmuRemoteDisplayBox">
+            <property name="sensitive">False</property>
             <property name="can_focus">False</property>
+            <property name="halign">start</property>
+            <property name="valign">start</property>
             <property name="orientation">vertical</property>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
             <child>
               <placeholder/>
             </child>

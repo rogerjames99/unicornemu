@@ -3,7 +3,7 @@
 import logging
 import argparse
 import os
-from gi.repository import Gtk, GLib, Gio, GObject, DBus
+from gi.repository import Gdk, Gtk, GLib, Gio, GObject, DBus
 import cairo
 import numpy as np
 import random
@@ -328,37 +328,53 @@ class UnicornEmu(Gtk.Application):
             # Initialisation
             ###############################################################################################################
  
-            def __init__(self, host, port, container):
+
+            def __init__(self, hostname, address, portNumber, container):
                 logging.debug('Creating new MatrixDisplay object')
                 
                 self.hatSize = 8
                 self.imageSize = 1000
-                self.host = host
-                self.port = port
+                self.hostname = hostname
+                self.address = address
+                self.portNumber = portNumber
                 
                 # Use cairo to do the matrix stuff
                 self.surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.imageSize, self.imageSize)
                 self.context = cairo.Context(self.surface)
                 
-                #TODO window creation and hooking into current container
+                # Create gtk stuff
                 builder = Gtk.Builder.new_from_resource('/uk/co/beardandsandals/UnicornEmu/remotehost.ui')    
                 builder.connect_signals(self)
                 self.frame = builder.get_object('unicornemuRemoteHost')
                 self.drawingArea = builder.get_object('drawingArea')
                     
-
                 self.tcolours = {'r': (1, 0, 0), 'red': (1, 0, 0), 'g': (0, 1, 0), 'green': (0, 1, 0), 'b': (0, 0, 1), 'blue': (0, 0, 1),
                             'c': (0, 1, 1), 'cyan': (0, 1, 1), 'm': (1, 0, 1), 'magenta': (1, 0, 1), 'y': (1, 1, 0), 'yellow': (1, 1, 0),
                             'w': (1, 1, 1), 'white': (1, 1, 1), '0': (0, 0, 0), 'off': (0, 0, 0), '1': (1, 1, 1), 'on': (1, 1, 1),
                             'z': (0, 0, 0), 'invert': (0, 0, 0), 'random' : (0,0,0)}
                 self.lastColour = (0,0,0)
-                if host == 'localhost':
-                    self.title = GLib.get_host_name()
+                
+                if hostname == 'localhost':
+                    self.hostname_for_title = GLib.get_host_name()
+                    self.drawingArea.set_size_request(500, 500)
                     container.pack_end(self.frame, False, False, 0)
                 else:
-                    self.title = host
-                    container.pack_start(self.frame)
-
+                    self.hostname_for_title = hostname
+                    self.drawingArea.set_size_request(100, 100)
+                    container.pack_start(self.frame, False, False, 0)
+                
+                '''    
+                print 'expand', self.drawingArea.get_property('expand'), \
+                        'height-request', self.drawingArea.get_property('height-request'), \
+                        'width-request', self.drawingArea.get_property('width-request'), \
+                        'hexpand', self.drawingArea.get_property('hexpand'), \
+                        'vexpand', self.drawingArea.get_property('vexpand'), \
+                        'hexpand-set', self.drawingArea.get_property('hexpand-set'), \
+                        'vexpand-set', self.drawingArea.get_property('vexpand-set')
+                        
+                GLib.idle_add(self.constrain_aspect_ration_callback)
+                '''
+                    
                 logging.debug('Surface matrix')
                 self.context.scale(float(self.surface.get_width()) / self.hatSize, -float(self.surface.get_height()) / self.hatSize)
                 self.context.translate(-1, -(self.hatSize + 1))
@@ -375,8 +391,10 @@ class UnicornEmu(Gtk.Application):
                 # Connect to scratch
                 self.socketClient = Gio.SocketClient.new() # Keep this hanging about in case of time outs etc.
                 logging.debug('Started connection process %d', GLib.get_monotonic_time())
-                self.socketClient.connect_to_host_async(host, port, None, self.connect_to_host_async_callback, None)
-                
+                if  len(self.address) > 0:
+                    self.socketClient.connect_to_host_async(self.address, self.portNumber, None, self.connect_to_host_async_callback, None)
+                else:
+                    self.socketClient.connect_to_host_async(self.hostname, self.portNumber, None, self.connect_to_host_async_callback, None)
                 
             ###############################################################################################################
             # Callbacks                
@@ -393,7 +411,7 @@ class UnicornEmu(Gtk.Application):
                         # Try again in 30 seconds
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.frame.set_label("%s '%s'" % (self.title, error.message))
+                        self.frame.set_label("%s '%s'" % (self.hostname_for_title, '!'))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND or \
@@ -401,7 +419,7 @@ class UnicornEmu(Gtk.Application):
                         # Cannot resolve the hostname
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.frame.set_label("%s '%s'" % (self.title, error.message))
+                        self.frame.set_label("%s '%s'" % (self.hostname_for_title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.NETWORK_UNREACHABLE or \
@@ -409,7 +427,7 @@ class UnicornEmu(Gtk.Application):
                         # Network failure (ICMP destination unreachable code)
                         logging.debug(error.message)
                         logging.debug('creating timeout %d', error.code)
-                        self.frame.set_label('%s (%s)' % (self.title, error.message))
+                        self.frame.set_label('%s (%s)' % (self.hostname_for_title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     else:
@@ -421,7 +439,7 @@ class UnicornEmu(Gtk.Application):
                     
                 if self.socketConnection != None:
                     logging.debug('Connected at first attempt')
-                    self.frame.set_label('%s (connected)' % self.title)
+                    self.frame.set_label('%s (connected)' % self.hostname_for_title)
                     self.inputStream = self.socketConnection.get_input_stream()
                     # Start read scratch messages
                     self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
@@ -438,7 +456,7 @@ class UnicornEmu(Gtk.Application):
                         # Try again in 30 seconds
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.frame.set_label('%s (%s)' % (self.title, error.message))
+                        self.frame.set_label('%s (%s)' % (self.hostname_for_title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND or \
@@ -446,7 +464,7 @@ class UnicornEmu(Gtk.Application):
                         # Cannot resolve the hostname
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.frame.set_label('%s (%s)' % (self.title, error.message))
+                        self.frame.set_label('%s (%s)' % (self.hostname_for_title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.NETWORK_UNREACHABLE or \
@@ -454,7 +472,7 @@ class UnicornEmu(Gtk.Application):
                         # Network failure (ICMP destination unreachable code)
                         logging.debug(error.message)
                         logging.debug('creating timeout %d', error.code)
-                        self.frame.set_label('%s (%s)' % (self.title, error.message))
+                        self.frame.set_label('%s (%s)' % (self.hostname_for_title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     else:
@@ -463,15 +481,21 @@ class UnicornEmu(Gtk.Application):
                         dialog.run()
                         self.window.close()
                         return
-                    
+                
                 if self.socketConnection:
                     logging.debug('Connected after a retry')
-                    self.frame.set_label('%s (connected)' % self.title)
+                    self.frame.set_label('%s (connected)' % self.hostname_for_title)
                     self.inputStream = self.socketConnection.get_input_stream()
                     self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
                 else:
                     logging.debug('should not get here 2')
                 
+            def constrain_aspect_ration_callback(self):
+                print 'Constrain aspect ratio' # I have tried this four ways since last sunday and still cannot get it to work!!!!
+                hints = Gdk.Geometry()
+                hints.max_aspect = hints.min_aspect = 1.
+                self.drawingArea.get_toplevel().set_geometry_hints(self.drawingArea, hints, Gdk.WindowHints.ASPECT)
+            
             def drawMatrix(self, widget, cr):
                 logging.debug('Draw callback')
                 x ,y, width, height = cr.clip_extents()
@@ -501,7 +525,7 @@ class UnicornEmu(Gtk.Application):
                     # May need to rethink this if I see fragmentation
                     logging.debug('Reconnecting')
                     self.socketConnection.close()
-                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connection lost)' % self.title)
+                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connection lost)' % self.hostname_for_title)
                     self.socketClient = Gio.SocketClient.new()
                     GLib.timeout_add_seconds(30, self.retry_connect)
                     return
@@ -528,7 +552,7 @@ class UnicornEmu(Gtk.Application):
                     # I assume the connection is broken in some way so close it and start again
                     logging.debug('Reconnecting')
                     self.socketConnection.close()
-                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connection lost)' % self.title)
+                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connection lost)' % self.hostname_for_title)
                     self.socketClient = Gio.SocketClient.new()
                     GLib.timeout_add_seconds(30, self.retry_connect)
                     return
@@ -548,8 +572,8 @@ class UnicornEmu(Gtk.Application):
             
             def retry_connect(self):
                 logging.debug('retry connect')
-                self.socketClient.connect_to_host_async(self.host,
-                                                        self.port,
+                self.socketClient.connect_to_host_async(self.hostname,
+                                                        self.portNumber,
                                                         None,
                                                         self.connect_to_host_async_timer_callback, None)
                 # make this a one off timer
@@ -851,7 +875,11 @@ class UnicornEmu(Gtk.Application):
         def __init__(self, application, *args):
             # Constants
             self.localHostname = GLib.get_host_name()
-
+            
+            # Local variables
+            self.avahiServiceCache = {} # indexed by avahi cache number
+            self.thumbnailMatrixDisplays = {} # indexed by hostname
+            
             # Set up the gui                                 
             self.builder = Gtk.Builder.new_from_resource('/uk/co/beardandsandals/UnicornEmu/unicornemu.ui')    
             self.builder.connect_signals(self)
@@ -859,7 +887,7 @@ class UnicornEmu(Gtk.Application):
             mainWindow.set_application(application)
             mainWindow.show()
             
-            self.primaryMatrix = self.MatrixDisplay(application.hostname, 42001, self.builder.get_object('unicormEmuLocalDisplayBox'))
+            self.primaryMatrix = self.MatrixDisplay(application.hostname, "", 42001, self.builder.get_object('unicormEmuLocalDisplayBox'))
             
             # Start the process of connecting to Avahi
             if application.avahiSupport:
@@ -873,7 +901,7 @@ class UnicornEmu(Gtk.Application):
             if signal == 'ItemNew':
                 '''
                 <signal name="ItemNew">
-                  <arg name="interface" type="i"/>
+                  <arg name="interface" type="i"/>   # RFJ This is actaully a unique number identfying the entry in the browsers cache
                   <arg name="protocol" type="i"/>
                   <arg name="name" type="s"/>
                   <arg name="type" type="s"/>
@@ -881,6 +909,20 @@ class UnicornEmu(Gtk.Application):
                   <arg name="flags" type="u"/>
                 </signal>
                 '''
+                cacheNumber = args[0]
+                protocol = args[1]
+                name = args[2]
+                service_type = args[3]
+                domain = args[4]
+                flags = args[5]
+                
+                logging.debug("ItemNew -\ncacheNumber %d\nprotocol %d\nname '%s'\ntype '%s'\ndomain '%s'\nflags 0x%X", \
+                            cacheNumber, protocol, name, service_type, domain, flags)
+                            
+                if cacheNumber in self.avahiServiceCache:
+                    # ignore this for the time being - more work needed to handle service detail changes
+                    logging.debug("Ignoring avahi entry already in cache")
+                    return
                 
                 '''
                 <method name="ResolveService">
@@ -905,22 +947,38 @@ class UnicornEmu(Gtk.Application):
                   <arg name="flags" type="u" direction="out"/>
                 </method>
                 '''
-                returns = self.avahiserver.ResolveService('(iisssiu)',
-                        args[0], # Interface
-                        args[1], # Protocol
-                        args[2], # Name
-                        args[3], # Service Type 
-                        args[4], # Domain
-                        avahi.PROTO_UNSPEC, # aprotocol 
-                        0) # flags
-                logging.debug("Found service - name '%s\ntype '%s\ndomain '%s'\nhost '%s'\naprotocol %d\nip-address '%s'\nport number #%d", \
-                        returns[2], returns[3], returns[4], returns[5], returns[6], returns[7], returns[8])
-                        
+                try:
+                    returns = self.avahiserver.ResolveService('(iisssiu)', cacheNumber, protocol, name, service_type,
+                                                                        domain, avahi.PROTO_INET, 0)
+                except GLib.Error, error:
+                    logging.debug("Error on ResolveService method call -- code %d message '%s'", error.code, error.message)
+                    return
+                                                                        
+                resolved_cacheNumber = args[0]
+                resolved_protocol = args[1]
+                resolved_name = args[2]
+                resolved_service_type = args[3]
+                resolved_domain = args[4]
                 hostname = returns[5]
+                aprotocol = returns[6]
+                address = returns[7]
                 portnumber = int(returns[8])
-                        
+                txt = returns[9]
+                resolved_flags = returns[10]
+                logging.debug("Found service -\nresolved_cacheNumber %d\nresolved_protocol %d\nresolved_name '%s\n"
+                                "resolved_service_type '%s'\nresolved_domain '%s'\n"
+                                "hostname '%s\n' aprotocol %d\naddress '%s'\n"
+                                "portnumber 0x%X\ntxt '%s'\nresolved_flags 0x%X", \
+                            resolved_cacheNumber, resolved_protocol, resolved_name, resolved_service_type,  resolved_domain, \
+                            hostname, aprotocol, address, portnumber, txt, resolved_flags)
+                                        
+                 # Cache the result indexed by the cache number
+                self.avahiServiceCache[resolved_cacheNumber] = (hostname, address, portnumber)
+                       
                 if hostname.split('.')[0] != self.localHostname: 
-                    self.create_new_thumbnail(hostname, portnumber)
+                    logging.debug("Creating thumbnail for remote host '%s'", hostname)
+                    self.create_new_thumbnail(resolved_cacheNumber, hostname, address, portnumber)
+                    
             elif signal == 'ItemRemove':
                 '''
                 <signal name="ItemRemove"
@@ -932,7 +990,21 @@ class UnicornEmu(Gtk.Application):
                   <arg name="flags" type="u"/>
                 </signal>
                 '''
-                logging.debug('ItemRemoved ignored')
+                cacheNumber = args[0]
+                protocol = args[1]
+                name = args[2]
+                service_type = args[3]
+                domain = args[4]
+                flags = args[5]
+                
+                logging.debug("ItemRemove -\ncacheNumber %d\nprotocol %d\nname '%s'\ntype '%s'\ndomain '%s'\nflags 0x%X", \
+                            cacheNumber, protocol, name, service_type, domain, flags)
+                
+                if cacheNumber in self.avahiServiceCache:
+                    del self.avahiServiceCache[cacheNumber]
+                    logging.debug("KIll the wabbit")
+                else:
+                    logging.debug("cacheNumber %d not in my cache", cacheNumber)
             elif signal == 'Failure':
                 '''
                 <signal name="Failure">
@@ -960,7 +1032,7 @@ class UnicornEmu(Gtk.Application):
             # Also subscribe to the 'AllForNow' signal that used to signal that nothing more is availbale.
             # I need do this at this point because when I call the Avahi Server proxy object's ServiceBrowserNew method the new remote object
             # will immediately send an 'ItemNew' signal for each service that is currently available. followed by a single 'AllForNow' signal.
-            # These signals often arrive before the local DBusProxy object has completed its initialisation and I have had a chane to use its
+            # These signals often arrive before the local DBusProxy object has completed its initialisation and I have had a chance to use its
             # connect method to hook up to its rebroadcast of DBUS signals on the GObject signalling system.
             # I will unsubscribe these signals as soon as GObject signal has been successfully hooked up
             self.ItemNewId = self.systemDBusConnection.signal_subscribe(None, 'org.freedesktop.Avahi.ServiceBrowser', 'ItemNew', None, 
@@ -1012,11 +1084,16 @@ class UnicornEmu(Gtk.Application):
         # Methods            
         ###############################################################################################################
         
-        def create_new_thumbnail(self, hostname, portnumber):
-            # Create a new thumbnail window for a remote scratch host
-            print 'host', host, 'port', portnumber
-            
-                            
+        def create_new_thumbnail(self, index, hostname, address, portnumber):
+            # If this is a new host then create thumbnail
+            # For the time being this means I will ignore calls for multiple ports on the same host
+            if not hostname in self.thumbnailMatrixDisplays:
+                # Create a new thumbnail window for a remote scratch host
+                self.thumbnailMatrixDisplays[hostname] = (index, self.MatrixDisplay(hostname, address, portnumber, self.builder.get_object('unicormEmuLocalDisplayBox')))
+                
+        def destroy_thumbnail(self, hostname, portnumber):
+            pass
+
     ###############################################################################################################
     # Initialisation
     ###############################################################################################################

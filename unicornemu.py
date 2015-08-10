@@ -882,11 +882,11 @@ class UnicornEmu(Gtk.Application):
             # Set up the gui                                 
             self.builder = Gtk.Builder.new_from_resource('/uk/co/beardandsandals/UnicornEmu/unicornemu.ui')    
             self.builder.connect_signals(self)
-            mainWindow = self.builder.get_object('unicornemuApplicationWindow')
+            mainWindow = self.builder.get_object('unicornEmuApplicationWindow')
             mainWindow.set_application(application)
             mainWindow.show()
             
-            self.primaryMatrix = self.MatrixDisplay(application.hostname, "", 42001, self.builder.get_object('unicormEmuLocalDisplayBox'))
+            self.primaryMatrix = self.MatrixDisplay(application.hostname, "", 42001, self.builder.get_object('unicornEmuLocalDisplayBox'))
             
             # Start the process of connecting to Avahi
             if application.avahiSupport:
@@ -1087,7 +1087,7 @@ class UnicornEmu(Gtk.Application):
             # For the time being this means I will ignore calls for multiple ports on the same host
             if not (avahiDomain, avahiName) in self.avahiToThumbnailMap:
                 # Create a new thumbnail window for a remote scratch host
-                self.avahiToThumbnailMap[(avahiDomain, avahiName)] = self.MatrixDisplay(hostname, address, portnumber, self.builder.get_object('unicormEmuLocalDisplayBox'))
+                self.avahiToThumbnailMap[(avahiDomain, avahiName)] = self.MatrixDisplay(hostname, address, portnumber, self.builder.get_object('unicormEmuRemoteDisplayBox'))
                 logging.debug("Thumbnail map after add '%s'", self.avahiToThumbnailMap)
                 
         def destroy_thumbnail(self, avahiDomain, avahiName):

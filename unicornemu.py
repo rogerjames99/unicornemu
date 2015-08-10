@@ -358,6 +358,7 @@ class UnicornEmu(Gtk.Application):
                     self.hostname_for_title = GLib.get_host_name()
                     self.drawingArea.set_size_request(500, 500)
                     container.pack_end(self.frame, False, False, 0)
+                    container.set_child_packing(self.frame, True, True, 0, Gtk.PackType.START)
                 else:
                     self.hostname_for_title = hostname
                     self.drawingArea.set_size_request(100, 100)
@@ -564,8 +565,7 @@ class UnicornEmu(Gtk.Application):
                 # Read the content of the scratch message
                 self.inputStream.read_bytes_async(self.scratch_message_length, GLib.PRIORITY_HIGH, None, 
                                                 self.read_scratch_message_content_callback, None)
-
-
+                                                
             ###############################################################################################################
             # Methods              
             ###############################################################################################################

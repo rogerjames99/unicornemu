@@ -412,7 +412,7 @@ class UnicornEmu(Gtk.Application):
                         # Try again in 30 seconds
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.frame.set_label("%s '%s'" % (self.hostname_for_title, '!'))
+                        self.frame.get_label_widget().set_text("%s '%s'" % (self.hostname_for_title, '!'))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND or \
@@ -420,7 +420,7 @@ class UnicornEmu(Gtk.Application):
                         # Cannot resolve the hostname
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.frame.set_label("%s '%s'" % (self.hostname_for_title, error.message))
+                        self.frame.get_label_widget().set_text("%s '%s'" % (self.hostname_for_title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.NETWORK_UNREACHABLE or \
@@ -428,7 +428,7 @@ class UnicornEmu(Gtk.Application):
                         # Network failure (ICMP destination unreachable code)
                         logging.debug(error.message)
                         logging.debug('creating timeout %d', error.code)
-                        self.frame.set_label('%s (%s)' % (self.hostname_for_title, error.message))
+                        self.frame.get_label_widget().set_text('%s (%s)' % (self.hostname_for_title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     else:
@@ -440,7 +440,7 @@ class UnicornEmu(Gtk.Application):
                     
                 if self.socketConnection != None:
                     logging.debug('Connected at first attempt')
-                    self.frame.set_label('%s (connected)' % self.hostname_for_title)
+                    self.frame.get_label_widget().set_text('%s (connected)' % self.hostname_for_title)
                     self.inputStream = self.socketConnection.get_input_stream()
                     # Start read scratch messages
                     self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
@@ -457,7 +457,7 @@ class UnicornEmu(Gtk.Application):
                         # Try again in 30 seconds
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.frame.set_label('%s (%s)' % (self.hostname_for_title, error.message))
+                        self.frame.get_label_widget().set_text('%s (%s)' % (self.hostname_for_title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND or \
@@ -465,7 +465,7 @@ class UnicornEmu(Gtk.Application):
                         # Cannot resolve the hostname
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.frame.set_label('%s (%s)' % (self.hostname_for_title, error.message))
+                        self.frame.get_label_widget().set_text('%s (%s)' % (self.hostname_for_title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     elif error.code == Gio.IOErrorEnum.NETWORK_UNREACHABLE or \
@@ -473,7 +473,7 @@ class UnicornEmu(Gtk.Application):
                         # Network failure (ICMP destination unreachable code)
                         logging.debug(error.message)
                         logging.debug('creating timeout %d', error.code)
-                        self.frame.set_label('%s (%s)' % (self.hostname_for_title, error.message))
+                        self.frame.get_label_widget().set_text('%s (%s)' % (self.hostname_for_title, error.message))
                         GLib.timeout_add_seconds(30, self.retry_connect)
                         return
                     else:
@@ -485,7 +485,7 @@ class UnicornEmu(Gtk.Application):
                 
                 if self.socketConnection:
                     logging.debug('Connected after a retry')
-                    self.frame.set_label('%s (connected)' % self.hostname_for_title)
+                    self.frame.get_label_widget().set_text('%s (connected)' % self.hostname_for_title)
                     self.inputStream = self.socketConnection.get_input_stream()
                     self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
                 else:

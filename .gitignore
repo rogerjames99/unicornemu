@@ -1,0 +1,7 @@
+*~
+*.pyc
+*.xml
+*.gresource
+*.glade
+*.log
+*.save

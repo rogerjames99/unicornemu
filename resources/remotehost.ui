@@ -38,13 +38,8 @@
         <property name="valign">center</property>
         <property name="label" translatable="yes">Remote Host</property>
         <property name="wrap">True</property>
-        <property name="width_chars">12</property>
-        <property name="max_width_chars">12</property>
+        <property name="wrap_mode">char</property>
         <property name="track_visited_links">False</property>
-        <attributes>
-          <attribute name="foreground" value="#2e2e34343636"/>
-          <attribute name="background" value="#d3d3d7d7cfcf"/>
-        </attributes>
       </object>
     </child>
   </object>

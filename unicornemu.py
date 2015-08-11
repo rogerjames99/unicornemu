@@ -304,7 +304,8 @@ NodeInfoForServiceBrowser = Gio.DBusNodeInfo.new_for_xml('''<?xml version="1.0" 
 
 
 
-logFormat = '%(thread)x %(funcName)s %(lineno)d %(levelname)s:%(message)s'
+#logFormat = '%(thread)x %(funcName)s %(lineno)d %(levelname)s:%(message)s'
+logFormat = '%(funcName)s %(lineno)d %(levelname)s:%(message)s'
 
 def logmatrix(logger, matrix):
     xx, yx, xy, yy, x0, y0 = matrix
@@ -337,6 +338,9 @@ class UnicornEmu(Gtk.Application):
                 self.hostname = hostname
                 self.address = address
                 self.portNumber = portNumber
+                self.sweepx = 1
+                self.sweepy = 1
+                self.cancellable = Gio.Cancellable.new()
                 
                 # Use cairo to do the matrix stuff
                 self.surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.imageSize, self.imageSize)
@@ -364,18 +368,6 @@ class UnicornEmu(Gtk.Application):
                     self.drawingArea.set_size_request(100, 100)
                     container.pack_start(self.frame, False, False, 0)
                 
-                '''    
-                print 'expand', self.drawingArea.get_property('expand'), \
-                        'height-request', self.drawingArea.get_property('height-request'), \
-                        'width-request', self.drawingArea.get_property('width-request'), \
-                        'hexpand', self.drawingArea.get_property('hexpand'), \
-                        'vexpand', self.drawingArea.get_property('vexpand'), \
-                        'hexpand-set', self.drawingArea.get_property('hexpand-set'), \
-                        'vexpand-set', self.drawingArea.get_property('vexpand-set')
-                        
-                GLib.idle_add(self.constrain_aspect_ration_callback)
-                '''
-                    
                 logging.debug('Surface matrix')
                 self.context.scale(float(self.surface.get_width()) / self.hatSize, -float(self.surface.get_height()) / self.hatSize)
                 self.context.translate(-1, -(self.hatSize + 1))
@@ -393,9 +385,9 @@ class UnicornEmu(Gtk.Application):
                 self.socketClient = Gio.SocketClient.new() # Keep this hanging about in case of time outs etc.
                 logging.debug('Started connection process %d', GLib.get_monotonic_time())
                 if  len(self.address) > 0:
-                    self.socketClient.connect_to_host_async(self.address, self.portNumber, None, self.connect_to_host_async_callback, None)
+                    self.socketClient.connect_to_host_async(self.address, self.portNumber, self.cancellable, self.connect_to_host_async_callback, None)
                 else:
-                    self.socketClient.connect_to_host_async(self.hostname, self.portNumber, None, self.connect_to_host_async_callback, None)
+                    self.socketClient.connect_to_host_async(self.hostname, self.portNumber, self.cancellable, self.connect_to_host_async_callback, None)
                 
             ###############################################################################################################
             # Callbacks                
@@ -403,6 +395,9 @@ class UnicornEmu(Gtk.Application):
             
             def connect_to_host_async_callback(self, source_object, res, user_data):
                 logging.debug( 'async_callback %d', GLib.get_monotonic_time())
+                label = self.frame.get_label_widget()
+                if label is None:
+                    return
                 try:
                     self.socketConnection = self.socketClient.connect_to_host_finish(res)
                 except GLib.Error, error:
@@ -412,24 +407,24 @@ class UnicornEmu(Gtk.Application):
                         # Try again in 30 seconds
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.frame.get_label_widget().set_text("%s '%s'" % (self.hostname_for_title, '!'))
-                        GLib.timeout_add_seconds(30, self.retry_connect)
+                        label.set_text("%s '%s'" % (self.hostname_for_title, error.message))
+                        GLib.timeout_add_seconds(30, self.retry_connect_callback)
                         return
                     elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND or \
                             error.code == Gio.IOErrorEnum.FAILED: # Gtk seems to return zero for host not found
                         # Cannot resolve the hostname
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.frame.get_label_widget().set_text("%s '%s'" % (self.hostname_for_title, error.message))
-                        GLib.timeout_add_seconds(30, self.retry_connect)
+                        label.set_text("%s '%s'" % (self.hostname_for_title, error.message))
+                        GLib.timeout_add_seconds(30, self.retry_connect_callback)
                         return
                     elif error.code == Gio.IOErrorEnum.NETWORK_UNREACHABLE or \
                             error.code == Gio.IOErrorEnum.HOST_UNREACHABLE:
                         # Network failure (ICMP destination unreachable code)
                         logging.debug(error.message)
                         logging.debug('creating timeout %d', error.code)
-                        self.frame.get_label_widget().set_text('%s (%s)' % (self.hostname_for_title, error.message))
-                        GLib.timeout_add_seconds(30, self.retry_connect)
+                        label.set_text('%s (%s)' % (self.hostname_for_title, error.message))
+                        GLib.timeout_add_seconds(30, self.retry_connect_callback)
                         return
                     else:
                         logging.debug("connect callback code %d domain '%s' message '%s'", error.code, error.domain, error.message)
@@ -438,12 +433,12 @@ class UnicornEmu(Gtk.Application):
                         self.window.close()
                         return
                     
-                if self.socketConnection != None:
+                if not self.socketConnection is None:
                     logging.debug('Connected at first attempt')
                     self.frame.get_label_widget().set_text('%s (connected)' % self.hostname_for_title)
                     self.inputStream = self.socketConnection.get_input_stream()
                     # Start read scratch messages
-                    self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
+                    self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, self.cancellable, self.read_scratch_message_size_callback, None)
                 else:
                     logging.debug('should not get here 1')
 
@@ -451,30 +446,33 @@ class UnicornEmu(Gtk.Application):
                 try:
                     self.socketConnection = self.socketClient.connect_to_host_finish(res)
                 except GLib.Error, error:
+                    label = self.frame.get_label_widget()
+                    if label is None:
+                        return
                     if error.code == Gio.IOErrorEnum.CONNECTION_REFUSED or \
                             error.code == Gio.IOErrorEnum.TIMED_OUT:
                         # Scratch has not responded or has refused the connection
                         # Try again in 30 seconds
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.frame.get_label_widget().set_text('%s (%s)' % (self.hostname_for_title, error.message))
-                        GLib.timeout_add_seconds(30, self.retry_connect)
+                        label.set_text('%s (%s)' % (self.hostname_for_title, error.message))
+                        GLib.timeout_add_seconds(30, self.retry_connect_callback)
                         return
                     elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND or \
                             error.code == Gio.IOErrorEnum.FAILED: # Gtk seems to return zero for host not found
                         # Cannot resolve the hostname
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
-                        self.frame.get_label_widget().set_text('%s (%s)' % (self.hostname_for_title, error.message))
-                        GLib.timeout_add_seconds(30, self.retry_connect)
+                        label.set_text('%s (%s)' % (self.hostname_for_title, error.message))
+                        GLib.timeout_add_seconds(30, self.retry_connect_callback)
                         return
                     elif error.code == Gio.IOErrorEnum.NETWORK_UNREACHABLE or \
                             error.code == Gio.IOErrorEnum.HOST_UNREACHABLE:
                         # Network failure (ICMP destination unreachable code)
                         logging.debug(error.message)
                         logging.debug('creating timeout %d', error.code)
-                        self.frame.get_label_widget().set_text('%s (%s)' % (self.hostname_for_title, error.message))
-                        GLib.timeout_add_seconds(30, self.retry_connect)
+                        label.set_text('%s (%s)' % (self.hostname_for_title, error.message))
+                        GLib.timeout_add_seconds(30, self.retry_connect_callback)
                         return
                     else:
                         logging.debug("connect callback code %d domain '%s' message '%s'", error.code, error.domain, error.message)
@@ -487,16 +485,10 @@ class UnicornEmu(Gtk.Application):
                     logging.debug('Connected after a retry')
                     self.frame.get_label_widget().set_text('%s (connected)' % self.hostname_for_title)
                     self.inputStream = self.socketConnection.get_input_stream()
-                    self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
+                    self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, self.cancellable, self.read_scratch_message_size_callback, None)
                 else:
                     logging.debug('should not get here 2')
                 
-            def constrain_aspect_ration_callback(self):
-                print 'Constrain aspect ratio' # I have tried this four ways since last sunday and still cannot get it to work!!!!
-                hints = Gdk.Geometry()
-                hints.max_aspect = hints.min_aspect = 1.
-                self.drawingArea.get_toplevel().set_geometry_hints(self.drawingArea, hints, Gdk.WindowHints.ASPECT)
-            
             def drawMatrix(self, widget, cr):
                 logging.debug('Draw callback')
                 x ,y, width, height = cr.clip_extents()
@@ -528,7 +520,7 @@ class UnicornEmu(Gtk.Application):
                     self.socketConnection.close()
                     self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connection lost)' % self.hostname_for_title)
                     self.socketClient = Gio.SocketClient.new()
-                    GLib.timeout_add_seconds(30, self.retry_connect)
+                    GLib.timeout_add_seconds(30, self.retry_connect_callback)
                     return
                 
                 logging.debug("Scratch message '%s'", scratch_message.get_data())
@@ -555,7 +547,7 @@ class UnicornEmu(Gtk.Application):
                     self.socketConnection.close()
                     self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connection lost)' % self.hostname_for_title)
                     self.socketClient = Gio.SocketClient.new()
-                    GLib.timeout_add_seconds(30, self.retry_connect)
+                    GLib.timeout_add_seconds(30, self.retry_connect_callback)
                     return
                 
                 self.scratch_message_length = struct.unpack('>L', count_bytes.get_data())[0]
@@ -566,113 +558,33 @@ class UnicornEmu(Gtk.Application):
                 self.inputStream.read_bytes_async(self.scratch_message_length, GLib.PRIORITY_HIGH, None, 
                                                 self.read_scratch_message_content_callback, None)
                                                 
-            ###############################################################################################################
-            # Methods              
-            ###############################################################################################################
-            
-            def retry_connect(self):
-                logging.debug('retry connect')
+            def retry_connect_callback(self):
+                logging.debug('retry connect callback')
                 self.socketClient.connect_to_host_async(self.hostname,
                                                         self.portNumber,
-                                                        None,
+                                                        self.cancellable,
                                                         self.connect_to_host_async_timer_callback, None)
                 # make this a one off timer
                 return False
 
-            def process_scratch_message(self, message):
-                words = message.split(' ',1)
+            def sweep_timer_callback(self):
+                logging.debug('sweepx %d sweepy %d', self.sweepx, self.sweepy)
+                self.sweepy += 1
+                if self.sweepy > self.hatSize:
+                    self.sweepy = 1
+                    self.sweepx += 1
+                self.context.set_source_rgba(random.random(), random.random(), random.random())
+                self.context.rectangle(self.sweepx, self.sweepy, 1, 1)
+                self.context.fill()
+                self.update()
+                if self.sweepx == self.hatSize and self.sweepy == self.hatSize:
+                    return False
+                return True
+                                                
+            ###############################################################################################################
+            # Methods              
+            ###############################################################################################################
             
-                if words[0].lower() != 'broadcast':
-                    logging.debug('Discarding message; not a broadcast')
-                    return
-                    
-                broadcast_message = words[1][1:-1]
-                broadcast_message = broadcast_message.lower()
-                commands = broadcast_message.split(' ')
-                
-                for command in commands:
-                    if command.startswith('matrixuse'):
-                        self.matrixuse()
-                    elif command == 'allon':
-                        self.allon()
-                    elif command == 'alloff':
-                        self.alloff()
-                    elif command == 'sweep':
-                        self.sweep()
-                    elif command.startswith('red'):
-                        self.setComponent('red', command[3:])
-                        logging.debug('red')
-                    elif command.startswith('green'):
-                        logging.debug('green')
-                    elif command.startswith('blue'):
-                        logging.debug('blue')
-                    elif command.startswith('colour'):
-                        self.colour(command[6:])
-                    elif command.startswith('pixel'):
-                        self.pixel(command[5:])
-                    elif command.startswith('bright'):
-                        logging.debug('bright')
-                    elif command.startswith('matrixpattern'):
-                        logging.debug('matrixpattern')
-                    elif command.startswith('move'):
-                        self.move(command[4:])
-                    elif command == 'invert':
-                        logging.debug('invert')
-                    elif command.startswith('level'):
-                        logging.debug('level')
-                    elif command.startswith('row'):
-                        self.row(command[3:])
-                    elif command.startswith('col'):
-                        self.col(command[3:])
-                    elif command.startswith('loadimage'):
-                        logging.debug('loadimage')
-                    elif command.startswith('saveimage'):
-                        logging.debug('saveimage')
-                    elif command.startswith('load2image'):
-                        logging.debug('load2image')
-
-            def update(self):
-                logging.debug('Dirtying the drawing area')
-                self.drawingArea.queue_draw()
-                
-            def colour(self, command):
-                logging.debug('colour')
-                paintColour = self.processColour(command)
-
-                if(paintColour[0] >= 0.):
-                    self.lastColour = paintColour
-            
-            def setComponent(self, component, parameters):
-                logging.debug('setComponent component: %s parameters %s', component, parameters)
-                if component == 'red':
-                    index = 0
-                elif component == 'green':
-                    index = 1
-                elif component == 'blue':
-                    index = 2
-                else:
-                    logging.debug('setComponent invalid component')
-                    return
-                
-                colour -1    
-                try:
-                    colour = int(parameters)
-                except ValueError:
-                    pass
-                    
-                if colour >= 0 and colour < 256:
-                    self.lastColour[index] = float(colour) / 255.
-                    return
-                elif parameters == 'on':
-                    self.lastColour[index] = 1
-                elif parameters == 'off':
-                    self.lastColour[index] = 0
-                else:
-                    logging.debug('setComponent invalid colour')
-
-            def matrixuse(self):
-                logging.debug('matrixuse')
-                
             def alloff(self):
                 logging.debug('alloff')
                 self.context.set_source_rgb(0, 0, 0)
@@ -685,16 +597,39 @@ class UnicornEmu(Gtk.Application):
                 self.context.paint()
                 self.update()
                 
-            def sweep(self):
-                logging.debug('sweep')
-                for x in range(1,self.hatSize + 1):
-                    for y in range(1,self.hatSize + 1):
-                        self.context.set_source_rgba(random.random(), random.random(), random.random())
-                        self.context.rectangle(x, y, 1, 1)
-                        self.context.fill()
+            def cleanup(self): # Kill any callbacks
+                logging.debug('Cleaning up cancellable functions')
+                if not self.cancellable is None:
+                    self.cancellable.cancel()
+                
+            def col(self, command):
+                logging.debug('col')
+                if command[0].isdigit() and int(command[0]) > 0 and int(command[0]) < 9 and command[1:].isalpha() and len(command[1:]) == 8:
+                    for row in range(1,self.hatSize + 1):
+                        if self.tcolours.has_key(command[row]):
+                            r, g, b = self.tcolours.get(command[row])
+                            self.context.set_source_rgba(r, g, b)
+                            self.context.rectangle(int(command[0]), row, 1, 1)
+                            self.context.fill()
+                        else:
+                            break
+                    if row == self.hatSize:
                         self.update()
-                        time.sleep(0.05)
+                    else:
+                        logging.debug('Col command badly formatted - bad colour')
+                else:
+                    logging.debug('Col command badly formatted %s %s %d', command[0], command[1:], len(command[1:]))
             
+            def colour(self, command):
+                logging.debug('colour')
+                paintColour = self.processColour(command)
+
+                if(paintColour[0] >= 0.):
+                    self.lastColour = paintColour
+            
+            def matrixuse(self):
+                logging.debug('matrixuse')
+                
             def move(self, command):
                 logging.debug('move')
                 # Grab the current contents of the surface
@@ -750,42 +685,6 @@ class UnicornEmu(Gtk.Application):
                                 
                 self.update()
             
-            def processColour(self, colour):  
-                paintColour = (-1, 0, 0)
-                if len(colour) > 0:
-                    if colour.isalpha():
-                        if self.tcolours.has_key(colour):
-                            if colour == 'random':
-                                paintColour = (random.random(), random.random(), random.random())
-                            elif colour == 'on':
-                                paintColour = self.lastColour
-                            elif colour == 'invert':
-                                pass
-                            else:
-                                paintColour = self.tcolours.get(colour)
-                        else:
-                            logging.debug('Unknown colour')
-                    else:
-                        # Check for some kind of number
-                        colournumber = -1
-                        if colour[0] == '#':
-                            colour = colour.replace('#', '0x', 1)
-                        logging.debug('Colour number string %s' % colour)
-                        try:
-                            colournumber = int(colour, 0)
-                        except ValueError:
-                            pass
-                        if colournumber >= 0 and colournumber < 0xffffff:
-                            r = float((colournumber & 0xff0000) >> 16) / 255.
-                            g = float((colournumber & 0xff00) >> 8) / 255.
-                            b = float(colournumber & 0xff)/ 255.
-                            paintColour = (r, g, b)
-                        else:
-                            logging.debug('Bad colour number')
-                else:
-                    logging.debug('Badly formatted colour command')
-                return paintColour
-                        
             def pixel(self, command):
                 logging.debug('pixel')
                 if command.find(',') != -1:
@@ -832,6 +731,94 @@ class UnicornEmu(Gtk.Application):
                     self.context.fill()
                     self.update()
             
+            def processColour(self, colour):  
+                paintColour = (-1, 0, 0)
+                if len(colour) > 0:
+                    if colour.isalpha():
+                        if self.tcolours.has_key(colour):
+                            if colour == 'random':
+                                paintColour = (random.random(), random.random(), random.random())
+                            elif colour == 'on':
+                                paintColour = self.lastColour
+                            elif colour == 'invert':
+                                pass
+                            else:
+                                paintColour = self.tcolours.get(colour)
+                        else:
+                            logging.debug('Unknown colour')
+                    else:
+                        # Check for some kind of number
+                        colournumber = -1
+                        if colour[0] == '#':
+                            colour = colour.replace('#', '0x', 1)
+                        logging.debug('Colour number string %s' % colour)
+                        try:
+                            colournumber = int(colour, 0)
+                        except ValueError:
+                            pass
+                        if colournumber >= 0 and colournumber < 0xffffff:
+                            r = float((colournumber & 0xff0000) >> 16) / 255.
+                            g = float((colournumber & 0xff00) >> 8) / 255.
+                            b = float(colournumber & 0xff)/ 255.
+                            paintColour = (r, g, b)
+                        else:
+                            logging.debug('Bad colour number')
+                else:
+                    logging.debug('Badly formatted colour command')
+                return paintColour
+                        
+            def process_scratch_message(self, message):
+                words = message.split(' ',1)
+            
+                if words[0].lower() != 'broadcast':
+                    logging.debug('Discarding message; not a broadcast')
+                    return
+                    
+                broadcast_message = words[1][1:-1]
+                broadcast_message = broadcast_message.lower()
+                commands = broadcast_message.split(' ')
+                
+                for command in commands:
+                    if command.startswith('matrixuse'):
+                        self.matrixuse()
+                    elif command == 'allon':
+                        self.allon()
+                    elif command == 'alloff':
+                        self.alloff()
+                    elif command == 'sweep':
+                        self.sweep()
+                    elif command.startswith('red'):
+                        self.setComponent('red', command[3:])
+                        logging.debug('red')
+                    elif command.startswith('green'):
+                        logging.debug('green')
+                    elif command.startswith('blue'):
+                        logging.debug('blue')
+                    elif command.startswith('colour'):
+                        self.colour(command[6:])
+                    elif command.startswith('pixel'):
+                        self.pixel(command[5:])
+                    elif command.startswith('bright'):
+                        logging.debug('bright')
+                    elif command.startswith('matrixpattern'):
+                        logging.debug('matrixpattern')
+                    elif command.startswith('move'):
+                        self.move(command[4:])
+                    elif command == 'invert':
+                        logging.debug('invert')
+                    elif command.startswith('level'):
+                        logging.debug('level')
+                    elif command.startswith('row'):
+                        self.row(command[3:])
+                    elif command.startswith('col'):
+                        self.col(command[3:])
+                    elif command.startswith('loadimage'):
+                        logging.debug('loadimage')
+                    elif command.startswith('saveimage'):
+                        logging.debug('saveimage')
+                    elif command.startswith('load2image'):
+                        logging.debug('load2image')
+
             def row(self, command):
                 logging.debug('row')
                 if command[0].isdigit() and int(command[0]) > 0 and int(command[0]) < 9 and command[1:].isalpha() and len(command[1:]) == 8:
@@ -850,24 +837,48 @@ class UnicornEmu(Gtk.Application):
                 else:
                     logging.debug('Row command badly formatted %s %s %d', command[0], command[1:], len(command[1:]))
             
-            def col(self, command):
-                logging.debug('col')
-                if command[0].isdigit() and int(command[0]) > 0 and int(command[0]) < 9 and command[1:].isalpha() and len(command[1:]) == 8:
-                    for row in range(1,self.hatSize + 1):
-                        if self.tcolours.has_key(command[row]):
-                            r, g, b = self.tcolours.get(command[row])
-                            self.context.set_source_rgba(r, g, b)
-                            self.context.rectangle(int(command[0]), row, 1, 1)
-                            self.context.fill()
-                        else:
-                            break
-                    if row == self.hatSize:
-                        self.update()
-                    else:
-                        logging.debug('Col command badly formatted - bad colour')
+            def setComponent(self, component, parameters):
+                logging.debug('setComponent component: %s parameters %s', component, parameters)
+                if component == 'red':
+                    index = 0
+                elif component == 'green':
+                    index = 1
+                elif component == 'blue':
+                    index = 2
                 else:
-                    logging.debug('Col command badly formatted %s %s %d', command[0], command[1:], len(command[1:]))
+                    logging.debug('setComponent invalid component')
+                    return
+                
+                colour -1    
+                try:
+                    colour = int(parameters)
+                except ValueError:
+                    pass
+                    
+                if colour >= 0 and colour < 256:
+                    self.lastColour[index] = float(colour) / 255.
+                    return
+                elif parameters == 'on':
+                    self.lastColour[index] = 1
+                elif parameters == 'off':
+                    self.lastColour[index] = 0
+                else:
+                    logging.debug('setComponent invalid colour')
+
+            def sweep(self):
+                logging.debug('sweep')
+                self.sweepx = 1
+                self.sweepy = 1
+                self.context.set_source_rgba(random.random(), random.random(), random.random())
+                self.context.rectangle(self.sweepx, self.sweepy, 1, 1)
+                self.context.fill()
+                self.update()
+                GLib.timeout_add(50, self.sweep_timer_callback)
             
+            def update(self):
+                logging.debug('Dirtying the drawing area')
+                self.drawingArea.queue_draw()
+                
         ###############################################################################################################
         # Initialisation
         ###############################################################################################################
@@ -1093,8 +1104,9 @@ class UnicornEmu(Gtk.Application):
         def destroy_thumbnail(self, avahiDomain, avahiName):
             logging.debug("Thumbnail map before delete'%s'", self.avahiToThumbnailMap)
             matrixDisplay = self.avahiToThumbnailMap[(avahiDomain, avahiName)]
+            matrixDisplay.cleanup()
             matrixDisplay.frame.destroy()
-            del self.avahiToThumbnailMap[(avahiDomain, avahiName)] # I am hoping that this detroys the MatrixDisplay object
+            del self.avahiToThumbnailMap[(avahiDomain, avahiName)] # I am hoping that this destroys the MatrixDisplay object
 
     ###############################################################################################################
     # Initialisation

@@ -5,13 +5,14 @@ import argparse
 import os
 from gi.repository import Gdk, Gtk, GLib, Gio, GObject, DBus
 import cairo
-import numpy as np
 import random
-import threading
-import time
 import struct
-import avahi
-import avahi
+
+avahiAvailable = True
+try:
+    import avahi
+except ImportError, error:
+    avahiAvailable = False
 
 # Node definitions for accessing Avahi via DBUS
 
@@ -308,8 +309,9 @@ NodeInfoForServiceBrowser = Gio.DBusNodeInfo.new_for_xml('''<?xml version="1.0" 
 logFormat = '%(funcName)s %(lineno)d %(levelname)s:%(message)s'
 
 def logmatrix(logger, matrix):
-    xx, yx, xy, yy, x0, y0 = matrix
-    logger('Matrix xx=%f yx=%f xy=%f yy=%f x0=%f y0=%f', xx, yx, xy, yy, x0, y0)
+    #xx, yx, xy, yy, x0, y0 = matrix
+    #logger('Matrix xx=%f yx=%f xy=%f yy=%f x0=%f y0=%f', xx, yx, xy, yy, x0, y0)
+    return
 
 class UnicornEmu(Gtk.Application):
 
@@ -383,7 +385,7 @@ class UnicornEmu(Gtk.Application):
                 
                 # Connect to scratch
                 self.socketClient = Gio.SocketClient.new() # Keep this hanging about in case of time outs etc.
-                logging.debug('Started connection process %d', GLib.get_monotonic_time())
+                logging.debug('Started connection process')
                 if  len(self.address) > 0:
                     self.socketClient.connect_to_host_async(self.address, self.portNumber, self.cancellable, self.connect_to_host_async_callback, None)
                 else:
@@ -394,7 +396,7 @@ class UnicornEmu(Gtk.Application):
             ###############################################################################################################
             
             def connect_to_host_async_callback(self, source_object, res, user_data):
-                logging.debug( 'async_callback %d', GLib.get_monotonic_time())
+                logging.debug( 'async_callback' )
                 label = self.frame.get_label_widget()
                 if label is None:
                     return
@@ -1119,12 +1121,12 @@ class UnicornEmu(Gtk.Application):
                    help='The hostname of the scratch desktop')
         parser.add_argument('-v', '--verbose', nargs='?', const=True, default=False,
                    help='Send debug logging to stderr')
-        parser.add_argument('-a', '--avahi', nargs='?', const=True, default=False,
-                   help='Enable avahi support')
+        if avahiAvailable:
+            parser.add_argument('-a', '--avahi', nargs='?', const=True, default=False,
+                       help='Enable avahi support')
 
         args = parser.parse_args()
-        self.hostname = args.hostname
-        self.avahiSupport = args.avahi
+        self.hostname = args.hostname            
                         
         Gtk.Application.__init__(self, application_id=application_id, flags=flags)
         
@@ -1141,6 +1143,13 @@ class UnicornEmu(Gtk.Application):
             formatter = logging.Formatter(logFormat)
             console.setFormatter(formatter)
             logging.getLogger('').addHandler(console)
+            
+        if avahiAvailable:
+            self.avahiSupport = args.avahi
+        else:
+            logging.debug('Avahi support not available')
+            self.avahiSupport = False
+
                              
         logging.debug('Loading resources')
         

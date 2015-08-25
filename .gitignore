@@ -5,3 +5,6 @@
 *.glade
 *.log
 *.save
+build
+pynsist_pkgs
+pygi.exe

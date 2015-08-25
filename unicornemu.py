@@ -7,12 +7,7 @@ from gi.repository import Gdk, Gtk, GLib, Gio, GObject, DBus
 import cairo
 import random
 import struct
-
-avahiAvailable = True
-try:
-    import avahi
-except ImportError, error:
-    avahiAvailable = False
+import platform
 
 # Node definitions for accessing Avahi via DBUS
 
@@ -1115,15 +1110,22 @@ class UnicornEmu(Gtk.Application):
     ###############################################################################################################
 
     def __init__(self, application_id, flags):
+        global avahi, pybonjour
         # Process command line options
         parser = argparse.ArgumentParser(description='Scratchgpio compatible emulator for Unicorn Hat')
         parser.add_argument('hostname', default='localhost', nargs='?',
                    help='The hostname of the scratch desktop')
         parser.add_argument('-v', '--verbose', nargs='?', const=True, default=False,
                    help='Send debug logging to stderr')
-        if avahiAvailable:
-            parser.add_argument('-a', '--avahi', nargs='?', const=True, default=False,
-                       help='Enable avahi support')
+        group = parser.add_mutually_exclusive_group()
+        group.add_argument('-a', nargs='?', const=True, default=False,
+                   help='Enable avahi support')
+        group.add_argument('--avahi', nargs='?', const=True, default=False,
+                   help='Enable avahi support')
+        group.add_argument('-b', nargs='?', const=True, default=False,
+                   help='Enable bonjour support')
+        group.add_argument('--bonjour', nargs='?', const=True, default=False,
+                   help='Enable bonjour support')
 
         args = parser.parse_args()
         self.hostname = args.hostname            
@@ -1134,7 +1136,7 @@ class UnicornEmu(Gtk.Application):
         self.connect('activate', self.activate_callback)
         
         # Initialise logging
-        logging.basicConfig(filename='unicornemu.log', level=logging.DEBUG, filemode='w', \
+        logging.basicConfig(filename=os.path.expanduser('~/unicornemu.log'), level=logging.DEBUG, filemode='w', \
                              format=logFormat)
                              
         console = logging.StreamHandler()
@@ -1144,18 +1146,32 @@ class UnicornEmu(Gtk.Application):
             console.setFormatter(formatter)
             logging.getLogger('').addHandler(console)
             
-        if avahiAvailable:
-            self.avahiSupport = args.avahi
-        else:
-            logging.debug('Avahi support not available')
-            self.avahiSupport = False
-
+        self.avahiSupport = False
+        self.bonjourSupport = False
+        if args.avahi:
+            try:
+                import avahi
+                self.avahiSupport = True
+            except ImportError, error:
+                dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.NONE, "Avahi support not available")
+                dialog.run()
+        elif args.bonjour:
+            try:
+                import pybonjour
+                self.bonjourSupport = True
+            except ImportError, error:
+                dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.NONE, "Bonjour support not available")
+                dialog.run()
                              
         logging.debug('Loading resources')
         
         # Load resources
         try:
-            resources = Gio.Resource.load(os.path.join('/usr/share/unicornemu', 'unicornemu.gresource'))
+            if platform.system() == 'Windows':
+                # Windows look in the current directory
+                resources = Gio.Resource.load('unicornemu.gresource')
+            else:
+                resources = Gio.Resource.load(os.path.join('/usr/share/unicornemu', 'unicornemu.gresource'))
         except GLib.Error:
             resources = Gio.Resource.load(os.path.join(os.getcwd(), 'resources/unicornemu.gresource'))
             

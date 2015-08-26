@@ -8,6 +8,8 @@ import cairo
 import random
 import struct
 import platform
+import threading
+import select
 
 # Node definitions for accessing Avahi via DBUS
 
@@ -300,8 +302,8 @@ NodeInfoForServiceBrowser = Gio.DBusNodeInfo.new_for_xml('''<?xml version="1.0" 
 
 
 
-#logFormat = '%(thread)x %(funcName)s %(lineno)d %(levelname)s:%(message)s'
-logFormat = '%(funcName)s %(lineno)d %(levelname)s:%(message)s'
+logFormat = '%(thread)x %(funcName)s %(lineno)d %(levelname)s:%(message)s'
+#logFormat = '%(funcName)s %(lineno)d %(levelname)s:%(message)s'
 
 def logmatrix(logger, matrix):
     #xx, yx, xy, yy, x0, y0 = matrix
@@ -899,12 +901,61 @@ class UnicornEmu(Gtk.Application):
             # Start the process of connecting to Avahi
             if application.avahiSupport:
                 Gio.bus_get(Gio.BusType.SYSTEM, None, self.bus_get_callback, None)
+            elif application.bonjourSupport:
+                # Easiest to use my own thread. I would really like to integrate this better with GOBject.
+                # More research needed on tbis
+                import threading
+                self.bonjourBrowserThread = threading.Thread(target = self.runBonjourBrowser)
+                self.runBonjour = True
+                self.bonjourBrowserThread.start()
+                
 
         ###############################################################################################################
         # Callbacks                
         ###############################################################################################################
 
-        def browserCallback(self, proxy, sender, signal, args):
+        def bonjourBrowserCallback(self, sdRef, flags, interfaceIndex, errorCode, serviceName,
+                                    regtype, replyDomain):
+                                        
+            if errorCode != pybonjour.kDNSServiceErr_NoError:
+                return
+
+            if not (flags & pybonjour.kDNSServiceFlagsAdd):
+                logging.debug('Service removed')
+                return
+
+            logging.debug('Service added; resolving')
+            self.bonjourResolved = []
+
+            resolve_sdRef = pybonjour.DNSServiceResolve(0,
+                                                        interfaceIndex,
+                                                        serviceName,
+                                                        regtype,
+                                                        replyDomain,
+                                                        self.bonjourResolverCallback)
+
+            try:
+                while not self.bonjourResolved:
+                    ready = select.select([resolve_sdRef], [], [], 5)
+                    if resolve_sdRef not in ready[0]:
+                        logging.debug('Resolve timed out')
+                        break
+                    pybonjour.DNSServiceProcessResult(resolve_sdRef)
+                else:
+                    self.bonjourResolved.pop()
+            finally:
+                resolve_sdRef.close()
+            
+            
+
+        def bonjourResolverCallback(self, sdRef, flags, interfaceIndex, errorCode, fullname,
+                             hosttarget, port, txtRecord):
+            if errorCode == pybonjour.kDNSServiceErr_NoError:
+                logging.debug("Resolved service: fullname '%s' hosttarget '%s' port %s", fullname, hosttarget, port)
+                self.bonjourResolved.append(True)
+
+        
+        def avahiBrowserCallback(self, proxy, sender, signal, args):
             if signal == 'ItemNew':
                 '''
                 <signal name="ItemNew">
@@ -1056,14 +1107,14 @@ class UnicornEmu(Gtk.Application):
         def dbus_signal_callback(self, connection, sender_name, object_path, interface_name, signal_name, arguments, user_data):
             if (signal_name == 'ItemNew') or (signal_name == 'AllForNow'):
                 # Pass the signal on to my GObject signal handler
-                self.browserCallback(None, sender_name, signal_name, arguments)
+                self.avahiBrowserCallback(None, sender_name, signal_name, arguments)
             else:
                 logging.debug('Should never see this')
                 Application.release()
                                                 
         def new_browser_proxy_callback(self, source_object, res, user_data):
             self.avahibrowser = Gio.DBusProxy.new_finish(res)
-            self.avahibrowser.connect('g-signal', self.browserCallback)
+            self.avahibrowser.connect('g-signal', self.avahiBrowserCallback)
             self.systemDBusConnection.signal_unsubscribe(self.ItemNewId)
             self.systemDBusConnection.signal_unsubscribe(self.AllForNowId)
                    
@@ -1084,6 +1135,7 @@ class UnicornEmu(Gtk.Application):
         
         def quit_cb(self, *args):
             logging.debug('Shutting down')
+            self.runBonjour = False
             logging.shutdown()
 
         ###############################################################################################################
@@ -1104,6 +1156,26 @@ class UnicornEmu(Gtk.Application):
             matrixDisplay.cleanup()
             matrixDisplay.frame.destroy()
             del self.avahiToThumbnailMap[(avahiDomain, avahiName)] # I am hoping that this destroys the MatrixDisplay object
+            
+        def runBonjourBrowser(self):
+            logging.debug('Running the bonjour browser')
+            self.browse_sdRef = pybonjour.DNSServiceBrowse(regtype = '_scratch._tcp',
+                                                            callBack = self.bonjourBrowserCallback)
+            try:
+                try:
+                    while self.runBonjour:
+                        ready = select.select([self.browse_sdRef], [], [], 1) # I hate having to use a timeout here! What a waste of cycles.
+                        if self.browse_sdRef in ready[0]:
+                            pybonjour.DNSServiceProcessResult(self.browse_sdRef)
+                except (KeyboardInterrupt, SystemExit):
+                    pass
+            finally:
+                self.browse_sdRef.close()
+                
+        def runBonjourResolver(self):
+            logging.debug('Running the bonjour browser')
+
+
 
     ###############################################################################################################
     # Initialisation

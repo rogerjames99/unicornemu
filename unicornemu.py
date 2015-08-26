@@ -920,39 +920,52 @@ class UnicornEmu(Gtk.Application):
             if errorCode != pybonjour.kDNSServiceErr_NoError:
                 return
 
-            if not (flags & pybonjour.kDNSServiceFlagsAdd):
-                logging.debug('Service removed')
-                return
+            if flags & pybonjour.kDNSServiceFlagsAdd:
+                logging.debug("Service added serviceName '%s' regtype '%s' replyDomain '%s'", serviceName, regtype, replyDomain)
+                self.bonjourResolved = []
 
-            logging.debug('Service added; resolving')
-            self.bonjourResolved = []
+                if (replyDomain, serviceName) in self.avahiToThumbnailMap:
+                    # ignore this for the time being - more work needed to handle service detail changes
+                    logging.debug("Ignoring bonjour entry already in cache")
+                    return
+                    
+                self.bonjourServiceName = serviceName
+                self.bonjourReplyDomain = replyDomain
+                    
+                resolve_sdRef = pybonjour.DNSServiceResolve(0,
+                                                            interfaceIndex,
+                                                            serviceName,
+                                                            regtype,
+                                                            replyDomain,
+                                                            self.bonjourResolverCallback)
 
-            resolve_sdRef = pybonjour.DNSServiceResolve(0,
-                                                        interfaceIndex,
-                                                        serviceName,
-                                                        regtype,
-                                                        replyDomain,
-                                                        self.bonjourResolverCallback)
-
-            try:
-                while not self.bonjourResolved:
-                    ready = select.select([resolve_sdRef], [], [], 5)
-                    if resolve_sdRef not in ready[0]:
-                        logging.debug('Resolve timed out')
-                        break
-                    pybonjour.DNSServiceProcessResult(resolve_sdRef)
+                try:
+                    while not self.bonjourResolved:
+                        ready = select.select([resolve_sdRef], [], [], 5)
+                        if resolve_sdRef not in ready[0]:
+                            logging.debug('Resolve timed out')
+                            break
+                        pybonjour.DNSServiceProcessResult(resolve_sdRef)
+                    else:
+                        self.bonjourResolved.pop()
+                finally:
+                    resolve_sdRef.close()
+                    
+            elif flags & pybonjour.kDNSServiceFlagsRemove:
+                if (replyDomain, serviceName) in self.avahiToThumbnailMap:
+                    logging.debug("Destroy thumbnail")
+                    self.destroy_thumbnail(domain, name)
                 else:
-                    self.bonjourResolved.pop()
-            finally:
-                resolve_sdRef.close()
+                    logging.debug("domain '%s' name '%s' not in my cache", domain, name)
             
-            
-
         def bonjourResolverCallback(self, sdRef, flags, interfaceIndex, errorCode, fullname,
                              hosttarget, port, txtRecord):
             if errorCode == pybonjour.kDNSServiceErr_NoError:
                 logging.debug("Resolved service: fullname '%s' hosttarget '%s' port %s", fullname, hosttarget, port)
                 self.bonjourResolved.append(True)
+                if hosttarget.split('.')[0] != self.localHostname: 
+                    logging.debug("Creating thumbnail for remote host '%s'", hosttarget)
+                    self.create_new_thumbnail(self.bonjourReplyDomain, self.bonjourServiceName, hosttarget, '', port)
 
         
         def avahiBrowserCallback(self, proxy, sender, signal, args):
@@ -967,7 +980,7 @@ class UnicornEmu(Gtk.Application):
                   <arg name="flags" type="u"/>
                 </signal>
                 '''
-                interface = args[0] # The 
+                interface = args[0]
                 protocol = args[1]
                 name = args[2]
                 service_type = args[3]

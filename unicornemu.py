@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 
-import logging
 import argparse
-import os
-from gi.repository import Gdk, Gtk, GLib, Gio, GObject, DBus
 import cairo
+from gi.repository import Gdk, Gtk, GLib, Gio, GObject, DBus
+import logging
+import os
 import random
-import struct
-import platform
-import threading
 import select
+import struct
+import sys
+import threading
 
 # Node definitions for accessing Avahi via DBUS
 
@@ -392,6 +392,12 @@ class UnicornEmu(Gtk.Application):
             # Callbacks                
             ###############################################################################################################
             
+            def bonjourRegisterCallback(self, sdRef, flags, errorCode, name, regtype, domain):
+                if errorCode == pybonjour.kDNSServiceErr_NoError:
+                    logging.debug("Registered service - name '%s' regtype '%s' domain '%s'", name, regtype, domain)
+                else:
+                    logging.debug("Failed to register service - errorcode %d", errorCode)
+        
             def connect_to_host_async_callback(self, source_object, res, user_data):
                 logging.debug( 'async_callback' )
                 label = self.frame.get_label_widget()
@@ -436,6 +442,7 @@ class UnicornEmu(Gtk.Application):
                     logging.debug('Connected at first attempt')
                     self.frame.get_label_widget().set_text('%s (connected)' % self.hostname_for_title)
                     self.inputStream = self.socketConnection.get_input_stream()
+                    self.publishHost()
                     # Start read scratch messages
                     self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, self.cancellable, self.read_scratch_message_size_callback, None)
                 else:
@@ -484,6 +491,7 @@ class UnicornEmu(Gtk.Application):
                     logging.debug('Connected after a retry')
                     self.frame.get_label_widget().set_text('%s (connected)' % self.hostname_for_title)
                     self.inputStream = self.socketConnection.get_input_stream()
+                    self.publishHost()
                     self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, self.cancellable, self.read_scratch_message_size_callback, None)
                 else:
                     logging.debug('should not get here 2')
@@ -817,7 +825,22 @@ class UnicornEmu(Gtk.Application):
                         logging.debug('saveimage')
                     elif command.startswith('load2image'):
                         logging.debug('load2image')
-
+                        
+            def publishHost(self):
+                if self.hostname == 'localhost':
+                    
+                    if sys.platform == 'win32':
+                        # Publish using pybonjour
+                        publisher = self.runPublishHostPyBonjour
+                    else:
+                        # Publish using avahi
+                        #publisher = runPublishHostAvahi
+                        publisher = self.runPublishHostPyBonjour
+                        
+                    self.publisherThread = threading.Thread(target = publisher)
+                    self.runPublisher = True
+                    self.publisherThread.start()
+            
             def row(self, command):
                 logging.debug('row')
                 if command[0].isdigit() and int(command[0]) > 0 and int(command[0]) < 9 and command[1:].isalpha() and len(command[1:]) == 8:
@@ -836,6 +859,26 @@ class UnicornEmu(Gtk.Application):
                 else:
                     logging.debug('Row command badly formatted %s %s %d', command[0], command[1:], len(command[1:]))
             
+            def runPublishHostAvahi(self):
+                pass
+                
+            def runPublishHostPyBonjour(self):
+                logging.debug('Running the bonjour publisher')
+                self.register_sdRef = pybonjour.DNSServiceRegister(name = '%s Scratch Remote Sensor Server' % self.hostname_for_title,
+                                                                    regtype = '_scratch._tcp', port = 42001, callBack = self.bonjourRegisterCallback)
+                try:
+                    try:
+                        while self.runPublisher:
+                            ready = select.select([self.register_sdRef], [], [], 1) # I hate having to use a timeout here! What a waste of cycles.
+                            if self.register_sdRef in ready[0]:
+                                pybonjour.DNSServiceProcessResult(self.register_sdRef)
+                    except (KeyboardInterrupt, SystemExit):
+                        pass
+                finally:
+                    logging.debug('Closing the bonjour publisher')
+                    self.register_sdRef.close()
+                
+
             def setComponent(self, component, parameters):
                 logging.debug('setComponent component: %s parameters %s', component, parameters)
                 if component == 'red':
@@ -904,7 +947,6 @@ class UnicornEmu(Gtk.Application):
             elif application.bonjourSupport:
                 # Easiest to use my own thread. I would really like to integrate this better with GOBject.
                 # More research needed on tbis
-                import threading
                 self.bonjourBrowserThread = threading.Thread(target = self.runBonjourBrowser)
                 self.runBonjour = True
                 self.bonjourBrowserThread.start()
@@ -1149,6 +1191,9 @@ class UnicornEmu(Gtk.Application):
         def quit_cb(self, *args):
             logging.debug('Shutting down')
             self.runBonjour = False
+            self.bonjourBrowserThread.join()
+            self.primaryMatrix.runPublisher = False
+            self.primaryMatrix.publisherThread.join()
             logging.shutdown()
 
         ###############################################################################################################
@@ -1183,13 +1228,9 @@ class UnicornEmu(Gtk.Application):
                 except (KeyboardInterrupt, SystemExit):
                     pass
             finally:
+                logging.debug('Closing the bonjour browser')
                 self.browse_sdRef.close()
                 
-        def runBonjourResolver(self):
-            logging.debug('Running the bonjour browser')
-
-
-
     ###############################################################################################################
     # Initialisation
     ###############################################################################################################
@@ -1252,7 +1293,8 @@ class UnicornEmu(Gtk.Application):
         
         # Load resources
         try:
-            if platform.system() == 'Windows':
+            logging.debug("sys.platform '%s'", sys.platform)
+            if sys.platform == 'win32':
                 # Windows look in the current directory
                 resources = Gio.Resource.load('unicornemu.gresource')
             else:

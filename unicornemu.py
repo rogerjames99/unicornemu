@@ -11,296 +11,7 @@ import struct
 import sys
 import threading
 
-# Node definitions for accessing Avahi via DBUS
-
-NodeInfoForServer = Gio.DBusNodeInfo.new_for_xml(
-'''<?xml version="1.0" standalone='no'?><!--*-nxml-*-->
-<?xml-stylesheet type="text/xsl" href="introspect.xsl"?>
-<!DOCTYPE node SYSTEM "introspect.dtd">
-
-<!--
-  This file is part of avahi.
-
-  avahi is free software; you can redistribute it and/or modify it
-  under the terms of the GNU Lesser General Public License as
-  published by the Free Software Foundation; either version 2 of the
-  License, or (at your option) any later version.
-
-  avahi is distributed in the hope that it will be useful, but
-  WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-  General Public License for more details.
-
-  You should have received a copy of the GNU Lesser General Public
-  License along with avahi; if not, write to the Free Software
-  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-  02111-1307 USA.
--->
-
-<node>
-
- <interface name="org.freedesktop.DBus.Introspectable">
-    <method name="Introspect">
-      <arg name="data" type="s" direction="out"/>
-    </method>
-  </interface>
-
-  <interface name="org.freedesktop.Avahi.Server">
-
-    <method name="GetVersionString">
-      <arg name="version" type="s" direction="out"/>
-    </method>
-
-    <method name="GetAPIVersion">
-      <arg name="version" type="u" direction="out"/>
-    </method>
-
-    <method name="GetHostName">
-      <arg name="name" type="s" direction="out"/>
-    </method>
-    <method name="SetHostName">
-      <arg name="name" type="s" direction="in"/>
-    </method>
-    <method name="GetHostNameFqdn">
-      <arg name="name" type="s" direction="out"/>
-    </method>
-    <method name="GetDomainName">
-      <arg name="name" type="s" direction="out"/>
-    </method>
-
-    <method name="IsNSSSupportAvailable">
-      <arg name="yes" type="b" direction="out"/>
-    </method>
-
-    <method name="GetState">
-      <arg name="state" type="i" direction="out"/>
-    </method>
-
-    <signal name="StateChanged">
-      <arg name="state" type="i"/>
-      <arg name="error" type="s"/>
-    </signal>
-
-    <method name="GetLocalServiceCookie">
-      <arg name="cookie" type="u" direction="out"/>
-    </method>
-
-    <method name="GetAlternativeHostName">
-      <arg name="name" type="s" direction="in"/>
-      <arg name="name" type="s" direction="out"/>
-    </method>
-
-    <method name="GetAlternativeServiceName">
-      <arg name="name" type="s" direction="in"/>
-      <arg name="name" type="s" direction="out"/>
-    </method>
-
-    <method name="GetNetworkInterfaceNameByIndex">
-      <arg name="index" type="i" direction="in"/>
-      <arg name="name" type="s" direction="out"/>
-    </method>
-    <method name="GetNetworkInterfaceIndexByName">
-      <arg name="name" type="s" direction="in"/>
-      <arg name="index" type="i" direction="out"/>
-    </method>
-
-    <method name="ResolveHostName">
-      <arg name="interface" type="i" direction="in"/>
-      <arg name="protocol" type="i" direction="in"/>
-      <arg name="name" type="s" direction="in"/>
-      <arg name="aprotocol" type="i" direction="in"/>
-      <arg name="flags" type="u" direction="in"/>
-
-      <arg name="interface" type="i" direction="out"/>
-      <arg name="protocol" type="i" direction="out"/>
-      <arg name="name" type="s" direction="out"/>
-      <arg name="aprotocol" type="i" direction="out"/>
-      <arg name="address" type="s" direction="out"/>
-      <arg name="flags" type="u" direction="out"/>
-    </method>
-
-    <method name="ResolveAddress">
-      <arg name="interface" type="i" direction="in"/>
-      <arg name="protocol" type="i" direction="in"/>
-      <arg name="address" type="s" direction="in"/>
-      <arg name="flags" type="u" direction="in"/>
-
-      <arg name="interface" type="i" direction="out"/>
-      <arg name="protocol" type="i" direction="out"/>
-      <arg name="aprotocol" type="i" direction="out"/>
-      <arg name="address" type="s" direction="out"/>
-      <arg name="name" type="s" direction="out"/>
-      <arg name="flags" type="u" direction="out"/>
-    </method>
-
-    <method name="ResolveService">
-      <arg name="interface" type="i" direction="in"/>
-      <arg name="protocol" type="i" direction="in"/>
-      <arg name="name" type="s" direction="in"/>
-      <arg name="type" type="s" direction="in"/>
-      <arg name="domain" type="s" direction="in"/>
-      <arg name="aprotocol" type="i" direction="in"/>
-      <arg name="flags" type="u" direction="in"/>
-
-      <arg name="interface" type="i" direction="out"/>
-      <arg name="protocol" type="i" direction="out"/>
-      <arg name="name" type="s" direction="out"/>
-      <arg name="type" type="s" direction="out"/>
-      <arg name="domain" type="s" direction="out"/>
-      <arg name="host" type="s" direction="out"/>
-      <arg name="aprotocol" type="i" direction="out"/>
-      <arg name="address" type="s" direction="out"/>
-      <arg name="port" type="q" direction="out"/>
-      <arg name="txt" type="aay" direction="out"/>
-      <arg name="flags" type="u" direction="out"/>
-    </method>
-
-    <method name="EntryGroupNew">
-      <arg name="path" type="o" direction="out"/>
-    </method>
-
-    <method name="DomainBrowserNew">
-      <arg name="interface" type="i" direction="in"/>
-      <arg name="protocol" type="i" direction="in"/>
-      <arg name="domain" type="s" direction="in"/>
-      <arg name="btype" type="i" direction="in"/>
-      <arg name="flags" type="u" direction="in"/>
-
-      <arg name="path" type="o" direction="out"/>
-    </method>
-
-    <method name="ServiceTypeBrowserNew">
-      <arg name="interface" type="i" direction="in"/>
-      <arg name="protocol" type="i" direction="in"/>
-      <arg name="domain" type="s" direction="in"/>
-      <arg name="flags" type="u" direction="in"/>
-
-      <arg name="path" type="o" direction="out"/>
-    </method>
-
-    <method name="ServiceBrowserNew">
-      <arg name="interface" type="i" direction="in"/>
-      <arg name="protocol" type="i" direction="in"/>
-      <arg name="type" type="s" direction="in"/>
-      <arg name="domain" type="s" direction="in"/>
-      <arg name="flags" type="u" direction="in"/>
-
-      <arg name="path" type="o" direction="out"/>
-    </method>
-
-    <method name="ServiceResolverNew">
-      <arg name="interface" type="i" direction="in"/>
-      <arg name="protocol" type="i" direction="in"/>
-      <arg name="name" type="s" direction="in"/>
-      <arg name="type" type="s" direction="in"/>
-      <arg name="domain" type="s" direction="in"/>
-      <arg name="aprotocol" type="i" direction="in"/>
-      <arg name="flags" type="u" direction="in"/>
-
-      <arg name="path" type="o" direction="out"/>
-    </method>
-
-    <method name="HostNameResolverNew">
-      <arg name="interface" type="i" direction="in"/>
-      <arg name="protocol" type="i" direction="in"/>
-      <arg name="name" type="s" direction="in"/>
-      <arg name="aprotocol" type="i" direction="in"/>
-      <arg name="flags" type="u" direction="in"/>
-
-      <arg name="path" type="o" direction="out"/>
-    </method>
-
-    <method name="AddressResolverNew">
-      <arg name="interface" type="i" direction="in"/>
-      <arg name="protocol" type="i" direction="in"/>
-      <arg name="address" type="s" direction="in"/>
-      <arg name="flags" type="u" direction="in"/>
-
-      <arg name="path" type="o" direction="out"/>
-    </method>
-
-    <method name="RecordBrowserNew">
-      <arg name="interface" type="i" direction="in"/>
-      <arg name="protocol" type="i" direction="in"/>
-      <arg name="name" type="s" direction="in"/>
-      <arg name="clazz" type="q" direction="in"/>
-      <arg name="type" type="q" direction="in"/>
-      <arg name="flags" type="u" direction="in"/>
-
-      <arg name="path" type="o" direction="out"/>
-    </method>
-
-
-  </interface>
-</node>
-''')
-
-NodeInfoForServiceBrowser = Gio.DBusNodeInfo.new_for_xml('''<?xml version="1.0" standalone='no'?><!--*-nxml-*-->
-<?xml-stylesheet type="text/xsl" href="introspect.xsl"?>
-<!DOCTYPE node SYSTEM "introspect.dtd">
-
-<!--
-  This file is part of avahi.
-
-  avahi is free software; you can redistribute it and/or modify it
-  under the terms of the GNU Lesser General Public License as
-  published by the Free Software Foundation; either version 2 of the
-  License, or (at your option) any later version.
-
-  avahi is distributed in the hope that it will be useful, but
-  WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-  General Public License for more details.
-
-  You should have received a copy of the GNU Lesser General Public
-  License along with avahi; if not, write to the Free Software
-  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-  02111-1307 USA.
--->
-
-<node>
-
-  <interface name="org.freedesktop.DBus.Introspectable">
-    <method name="Introspect">
-      <arg name="data" type="s" direction="out" />
-    </method>
-  </interface>
-
-  <interface name="org.freedesktop.Avahi.ServiceBrowser">
-
-    <method name="Free"/>
-
-    <signal name="ItemNew">
-      <arg name="interface" type="i"/>
-      <arg name="protocol" type="i"/>
-      <arg name="name" type="s"/>
-      <arg name="type" type="s"/>
-      <arg name="domain" type="s"/>
-      <arg name="flags" type="u"/>
-    </signal>
-
-    <signal name="ItemRemove">
-      <arg name="interface" type="i"/>
-      <arg name="protocol" type="i"/>
-      <arg name="name" type="s"/>
-      <arg name="type" type="s"/>
-      <arg name="domain" type="s"/>
-      <arg name="flags" type="u"/>
-    </signal>
-
-    <signal name="Failure">
-      <arg name="error" type="s"/>
-    </signal>
-
-    <signal name="AllForNow"/>
-
-    <signal name="CacheExhausted"/>
-
-  </interface>
-</node>
-''')
-
-
+import time
 
 logFormat = '%(thread)x %(funcName)s %(lineno)d %(levelname)s:%(message)s'
 #logFormat = '%(funcName)s %(lineno)d %(levelname)s:%(message)s'
@@ -340,6 +51,8 @@ class UnicornEmu(Gtk.Application):
                 self.sweepx = 1
                 self.sweepy = 1
                 self.cancellable = Gio.Cancellable.new()
+                self.runPublisher = False
+
                 
                 # Use cairo to do the matrix stuff
                 self.surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.imageSize, self.imageSize)
@@ -392,7 +105,7 @@ class UnicornEmu(Gtk.Application):
             # Callbacks                
             ###############################################################################################################
             
-            def bonjourRegisterCallback(self, sdRef, flags, errorCode, name, regtype, domain):
+            def zeroconfRegisterCallback(self, sdRef, flags, errorCode, name, regtype, domain):
                 if errorCode == pybonjour.kDNSServiceErr_NoError:
                     logging.debug("Registered service - name '%s' regtype '%s' domain '%s'", name, regtype, domain)
                 else:
@@ -828,18 +541,11 @@ class UnicornEmu(Gtk.Application):
                         
             def publishHost(self):
                 if self.hostname == 'localhost':
-                    
-                    if sys.platform == 'win32':
-                        # Publish using pybonjour
-                        publisher = self.runPublishHostPyBonjour
-                    else:
-                        # Publish using avahi
-                        #publisher = runPublishHostAvahi
-                        publisher = self.runPublishHostPyBonjour
-                        
-                    self.publisherThread = threading.Thread(target = publisher)
-                    self.runPublisher = True
-                    self.publisherThread.start()
+                    if Application.zeroconfSupport:
+                        # Publish using zeroconf
+                        self.publisherThread = threading.Thread(target = self.runPublishHostZeroconf)
+                        self.runPublisher = True
+                        self.publisherThread.start()
             
             def row(self, command):
                 logging.debug('row')
@@ -859,13 +565,11 @@ class UnicornEmu(Gtk.Application):
                 else:
                     logging.debug('Row command badly formatted %s %s %d', command[0], command[1:], len(command[1:]))
             
-            def runPublishHostAvahi(self):
-                pass
-                
-            def runPublishHostPyBonjour(self):
-                logging.debug('Running the bonjour publisher')
+            def runPublishHostZeroconf(self):
+                logging.debug('Running the zeroconf publisher')
+                time.sleep(30)
                 self.register_sdRef = pybonjour.DNSServiceRegister(name = '%s Scratch Remote Sensor Server' % self.hostname_for_title,
-                                                                    regtype = '_scratch._tcp', port = 42001, callBack = self.bonjourRegisterCallback)
+                                                                    regtype = '_scratch._tcp', port = 42001, callBack = self.zeroconfRegisterCallback)
                 try:
                     try:
                         while self.runPublisher:
@@ -875,7 +579,7 @@ class UnicornEmu(Gtk.Application):
                     except (KeyboardInterrupt, SystemExit):
                         pass
                 finally:
-                    logging.debug('Closing the bonjour publisher')
+                    logging.debug('Closing the zeroconf publisher')
                     self.register_sdRef.close()
                 
 
@@ -930,7 +634,7 @@ class UnicornEmu(Gtk.Application):
             self.localHostname = GLib.get_host_name()
             
             # Local variables
-            self.avahiToThumbnailMap = {} # indexed by avahi domain and name
+            self.zeroconfToThumbnailMap = {} # indexed by zeoconf domain and name
             
             # Set up the gui                                 
             self.builder = Gtk.Builder.new_from_resource('/uk/co/beardandsandals/UnicornEmu/unicornemu.ui')    
@@ -941,22 +645,21 @@ class UnicornEmu(Gtk.Application):
             
             self.primaryMatrix = self.MatrixDisplay(application.hostname, "", 42001, self.builder.get_object('unicornEmuLocalDisplayBox'))
             
-            # Start the process of connecting to Avahi
-            if application.avahiSupport:
-                Gio.bus_get(Gio.BusType.SYSTEM, None, self.bus_get_callback, None)
-            elif application.bonjourSupport:
+            self.runZeroconf = False
+            if application.zeroconfSupport:
+                # Run the zeroconf service browser
                 # Easiest to use my own thread. I would really like to integrate this better with GOBject.
                 # More research needed on tbis
-                self.bonjourBrowserThread = threading.Thread(target = self.runBonjourBrowser)
-                self.runBonjour = True
-                self.bonjourBrowserThread.start()
+                self.zeroconfBrowserThread = threading.Thread(target = self.runZeroconfBrowser)
+                self.runZeroconf = True
+                self.zeroconfBrowserThread.start()
                 
 
         ###############################################################################################################
         # Callbacks                
         ###############################################################################################################
 
-        def bonjourBrowserCallback(self, sdRef, flags, interfaceIndex, errorCode, serviceName,
+        def zeroconfBrowserCallback(self, sdRef, flags, interfaceIndex, errorCode, serviceName,
                                     regtype, replyDomain):
                                         
             if errorCode != pybonjour.kDNSServiceErr_NoError:
@@ -964,271 +667,96 @@ class UnicornEmu(Gtk.Application):
 
             if flags & pybonjour.kDNSServiceFlagsAdd:
                 logging.debug("Service added serviceName '%s' regtype '%s' replyDomain '%s'", serviceName, regtype, replyDomain)
-                self.bonjourResolved = []
+                self.zeroconfResolved = []
 
-                if (replyDomain, serviceName) in self.avahiToThumbnailMap:
+                if (replyDomain, serviceName) in self.zeroconfToThumbnailMap:
                     # ignore this for the time being - more work needed to handle service detail changes
-                    logging.debug("Ignoring bonjour entry already in cache")
+                    logging.debug("Ignoring zeroconf entry already in cache")
                     return
                     
-                self.bonjourServiceName = serviceName
-                self.bonjourReplyDomain = replyDomain
+                self.zeroconfServiceName = serviceName
+                self.zeroconfReplyDomain = replyDomain
                     
                 resolve_sdRef = pybonjour.DNSServiceResolve(0,
                                                             interfaceIndex,
                                                             serviceName,
                                                             regtype,
                                                             replyDomain,
-                                                            self.bonjourResolverCallback)
+                                                            self.zeroconfResolverCallback)
 
                 try:
-                    while not self.bonjourResolved:
+                    while not self.zeroconfResolved:
                         ready = select.select([resolve_sdRef], [], [], 5)
                         if resolve_sdRef not in ready[0]:
                             logging.debug('Resolve timed out')
                             break
                         pybonjour.DNSServiceProcessResult(resolve_sdRef)
                     else:
-                        self.bonjourResolved.pop()
+                        self.zeroconfResolved.pop()
                 finally:
                     resolve_sdRef.close()
                     
             elif flags & pybonjour.kDNSServiceFlagsRemove:
-                if (replyDomain, serviceName) in self.avahiToThumbnailMap:
+                if (replyDomain, serviceName) in self.zeroconfToThumbnailMap:
                     logging.debug("Destroy thumbnail")
                     self.destroy_thumbnail(domain, name)
                 else:
                     logging.debug("domain '%s' name '%s' not in my cache", domain, name)
             
-        def bonjourResolverCallback(self, sdRef, flags, interfaceIndex, errorCode, fullname,
+        def zeroconfResolverCallback(self, sdRef, flags, interfaceIndex, errorCode, fullname,
                              hosttarget, port, txtRecord):
             if errorCode == pybonjour.kDNSServiceErr_NoError:
                 logging.debug("Resolved service: fullname '%s' hosttarget '%s' port %s", fullname, hosttarget, port)
-                self.bonjourResolved.append(True)
+                self.zeroconfResolved.append(True)
                 if hosttarget.split('.')[0] != self.localHostname: 
                     logging.debug("Creating thumbnail for remote host '%s'", hosttarget)
-                    self.create_new_thumbnail(self.bonjourReplyDomain, self.bonjourServiceName, hosttarget, '', port)
+                    # Need to queue this on the gui thread
+                    GLib.idle_add(self.create_new_thumbnail, self.zeroconfReplyDomain, self.zeroconfServiceName, hosttarget, '', port)
 
-        
-        def avahiBrowserCallback(self, proxy, sender, signal, args):
-            if signal == 'ItemNew':
-                '''
-                <signal name="ItemNew">
-                  <arg name="interface" type="i"/>   
-                  <arg name="protocol" type="i"/>
-                  <arg name="name" type="s"/>
-                  <arg name="type" type="s"/>
-                  <arg name="domain" type="s"/>
-                  <arg name="flags" type="u"/>
-                </signal>
-                '''
-                interface = args[0]
-                protocol = args[1]
-                name = args[2]
-                service_type = args[3]
-                domain = args[4]
-                flags = args[5]
-                
-                logging.debug("ItemNew -\ncacheNumber %d\nprotocol %d\nname '%s'\ntype '%s'\ndomain '%s'\nflags 0x%X", \
-                            interface, protocol, name, service_type, domain, flags)
-                            
-                if (domain, name) in self.avahiToThumbnailMap:
-                    # ignore this for the time being - more work needed to handle service detail changes
-                    logging.debug("Ignoring avahi entry already in cache")
-                    return
-                
-                '''
-                <method name="ResolveService">
-                  <arg name="interface" type="i" direction="in"/>
-                  <arg name="protocol" type="i" direction="in"/>
-                  <arg name="name" type="s" direction="in"/>
-                  <arg name="type" type="s" direction="in"/>
-                  <arg name="domain" type="s" direction="in"/>
-                  <arg name="aprotocol" type="i" direction="in"/>
-                  <arg name="flags" type="u" direction="in"/>
-
-                  <arg name="interface" type="i" direction="out"/>
-                  <arg name="protocol" type="i" direction="out"/>
-                  <arg name="name" type="s" direction="out"/>
-                  <arg name="type" type="s" direction="out"/>
-                  <arg name="domain" type="s" direction="out"/>
-                  <arg name="host" type="s" direction="out"/>
-                  <arg name="aprotocol" type="i" direction="out"/>
-                  <arg name="address" type="s" direction="out"/>
-                  <arg name="port" type="q" direction="out"/>
-                  <arg name="txt" type="aay" direction="out"/>
-                  <arg name="flags" type="u" direction="out"/>
-                </method>
-                '''
-                try:
-                    returns = self.avahiserver.ResolveService('(iisssiu)', interface, protocol, name, service_type,
-                                                                        domain, avahi.PROTO_INET, 0)
-                except GLib.Error, error:
-                    logging.debug("Error on ResolveService method call -- code %d message '%s'", error.code, error.message)
-                    return
-                                                                        
-                resolved_interface = args[0]
-                resolved_protocol = args[1]
-                resolved_name = args[2]
-                resolved_service_type = args[3]
-                resolved_domain = args[4]
-                hostname = returns[5]
-                aprotocol = returns[6]
-                address = returns[7]
-                portnumber = int(returns[8])
-                txt = returns[9]
-                resolved_flags = returns[10]
-                logging.debug("Found service -\nresolved_interface %d\nresolved_protocol %d\nresolved_name '%s\n"
-                                "resolved_service_type '%s'\nresolved_domain '%s'\n"
-                                "hostname '%s\n' aprotocol %d\naddress '%s'\n"
-                                "portnumber 0x%X\ntxt '%s'\nresolved_flags 0x%X", \
-                            resolved_interface, resolved_protocol, resolved_name, resolved_service_type,  resolved_domain, \
-                            hostname, aprotocol, address, portnumber, txt, resolved_flags)
-                                        
-                if hostname.split('.')[0] != self.localHostname: 
-                    logging.debug("Creating thumbnail for remote host '%s'", hostname)
-                    self.create_new_thumbnail(resolved_domain, resolved_name, hostname, address, portnumber)
-
-                    
-            elif signal == 'ItemRemove':
-                '''
-                <signal name="ItemRemove"
-                  <arg name="interface" type="i"/>
-                  <arg name="protocol" type="i"/>
-                  <arg name="name" type="s"/>
-                  <arg name="type" type="s"/>
-                  <arg name="domain" type="s"/>
-                  <arg name="flags" type="u"/>
-                </signal>
-                '''
-                interface = args[0]
-                protocol = args[1]
-                name = args[2]
-                service_type = args[3]
-                domain = args[4]
-                flags = args[5]
-                
-                logging.debug("ItemRemove -\ninterface %d\nprotocol %d\nname '%s'\ntype '%s'\ndomain '%s'\nflags 0x%X", \
-                            interface, protocol, name, service_type, domain, flags)
-                
-                if (domain, name) in self.avahiToThumbnailMap:
-                    logging.debug("Kill the wabbit")
-                    self.destroy_thumbnail(domain, name)
-                else:
-                    logging.debug("domain '%s' name '%s' not in my cache", domain, name)
-                    
-            elif signal == 'Failure':
-                '''
-                <signal name="Failure">
-                  <arg name="error" type="s"/>
-                </signal>
-                '''
-                logging.debug('Failure ignored')
-            elif signal == 'AllForNow':
-                '''
-                <signal name="AllForNow"/>
-                '''
-                logging.debug('AllForNow ignored')
-            elif signal == 'CacheExhausted':
-                '''
-                <signal name="CacheExhausted"/>
-                '''
-                logging.debug('CacheExhausted ignored')
-            else:
-                logging.debug("ignoring signal signal %s'", signal)
-            
-        def bus_get_callback(self, source_object, res, user_data):
-            self.systemDBusConnection = Gio.bus_get_finish(res)
-            
-            # Subscribe to the DBUS signal 'ItemNew' that is sent by Avahi Service Browser Objects to signal new services becoming available.
-            # Also subscribe to the 'AllForNow' signal that used to signal that nothing more is availbale.
-            # I need do this at this point because when I call the Avahi Server proxy object's ServiceBrowserNew method the new remote object
-            # will immediately send an 'ItemNew' signal for each service that is currently available. followed by a single 'AllForNow' signal.
-            # These signals often arrive before the local DBusProxy object has completed its initialisation and I have had a chance to use its
-            # connect method to hook up to its rebroadcast of DBUS signals on the GObject signalling system.
-            # I will unsubscribe these signals as soon as GObject signal has been successfully hooked up
-            self.ItemNewId = self.systemDBusConnection.signal_subscribe(None, 'org.freedesktop.Avahi.ServiceBrowser', 'ItemNew', None, 
-                                                        None, 0, self.dbus_signal_callback, None)
-            self.AllForNowId = self.systemDBusConnection.signal_subscribe(None, 'org.freedesktop.Avahi.ServiceBrowser', 'AllForNow', None, 
-                                                        None, 0, self.dbus_signal_callback, None)
-            
-            # Request a proxy for an Avahi DBUS_INTERFACE_SERVER object
-            Gio.DBusProxy.new(self.systemDBusConnection, 0, NodeInfoForServer.lookup_interface(avahi.DBUS_INTERFACE_SERVER),
-                                                avahi.DBUS_NAME,
-                                                avahi.DBUS_PATH_SERVER,
-                                                avahi.DBUS_INTERFACE_SERVER, None,
-                                                self.new_server_proxy_callback, None)
-                                                
-        def dbus_signal_callback(self, connection, sender_name, object_path, interface_name, signal_name, arguments, user_data):
-            if (signal_name == 'ItemNew') or (signal_name == 'AllForNow'):
-                # Pass the signal on to my GObject signal handler
-                self.avahiBrowserCallback(None, sender_name, signal_name, arguments)
-            else:
-                logging.debug('Should never see this')
-                Application.release()
-                                                
-        def new_browser_proxy_callback(self, source_object, res, user_data):
-            self.avahibrowser = Gio.DBusProxy.new_finish(res)
-            self.avahibrowser.connect('g-signal', self.avahiBrowserCallback)
-            self.systemDBusConnection.signal_unsubscribe(self.ItemNewId)
-            self.systemDBusConnection.signal_unsubscribe(self.AllForNowId)
-                   
-        def new_server_proxy_callback(self, source_object, res, user_data):
-            self.avahiserver = Gio.DBusProxy.new_finish(res)        
-            avahibrowserpath = self.avahiserver.ServiceBrowserNew('(iissu)',
-                                    avahi.IF_UNSPEC,
-                                    avahi.PROTO_INET,
-                                    '_scratch._tcp',
-                                    'local',
-                                    0)
-            
-            Gio.DBusProxy.new(self.systemDBusConnection, 0, NodeInfoForServiceBrowser.lookup_interface(avahi.DBUS_INTERFACE_SERVICE_BROWSER),
-                                                avahi.DBUS_NAME,
-                                                avahibrowserpath,
-                                                avahi.DBUS_INTERFACE_SERVICE_BROWSER, None,
-                                                self.new_browser_proxy_callback, None)
-        
         def quit_cb(self, *args):
             logging.debug('Shutting down')
-            self.runBonjour = False
-            self.bonjourBrowserThread.join()
-            self.primaryMatrix.runPublisher = False
-            self.primaryMatrix.publisherThread.join()
+            if self.runZeroconf == True:
+                self.runZeroconf = False
+                self.zeroconfBrowserThread.join()
+            if self.primaryMatrix.runPublisher == True:
+                self.primaryMatrix.runPublisher = False
+                self.primaryMatrix.publisherThread.join()
             logging.shutdown()
 
         ###############################################################################################################
         # Methods            
         ###############################################################################################################
         
-        def create_new_thumbnail(self, avahiDomain, avahiName, hostname, address, portnumber):
+        def create_new_thumbnail(self, zeroconfDomain, zeroconfName, hostname, address, portnumber):
             # If this is a new host then create thumbnail
             # For the time being this means I will ignore calls for multiple ports on the same host
-            if not (avahiDomain, avahiName) in self.avahiToThumbnailMap:
+            if not (zeroconfDomain, zeroconfName) in self.zeroconfToThumbnailMap:
                 # Create a new thumbnail window for a remote scratch host
-                self.avahiToThumbnailMap[(avahiDomain, avahiName)] = self.MatrixDisplay(hostname, address, portnumber, self.builder.get_object('unicormEmuRemoteDisplayBox'))
-                logging.debug("Thumbnail map after add '%s'", self.avahiToThumbnailMap)
+                self.zeroconfToThumbnailMap[(zeroconfDomain, zeroconfName)] = self.MatrixDisplay(hostname, address, portnumber, self.builder.get_object('unicormEmuRemoteDisplayBox'))
+                logging.debug("Thumbnail map after add '%s'", self.zeroconfToThumbnailMap)
+            return False # This function can be called via GLib.idle_add
                 
-        def destroy_thumbnail(self, avahiDomain, avahiName):
-            logging.debug("Thumbnail map before delete'%s'", self.avahiToThumbnailMap)
-            matrixDisplay = self.avahiToThumbnailMap[(avahiDomain, avahiName)]
+        def destroy_thumbnail(self, zeroconfDomain, zeroconfName):
+            logging.debug("Thumbnail map before delete'%s'", self.zeroconfToThumbnailMap)
+            matrixDisplay = self.zeroconfToThumbnailMap[(zeroconfDomain, zeroconfName)]
             matrixDisplay.cleanup()
             matrixDisplay.frame.destroy()
-            del self.avahiToThumbnailMap[(avahiDomain, avahiName)] # I am hoping that this destroys the MatrixDisplay object
+            del self.zeroconfToThumbnailMap[(zeroconfDomain, zeroconfName)] # I am hoping that this destroys the MatrixDisplay object
             
-        def runBonjourBrowser(self):
-            logging.debug('Running the bonjour browser')
+        def runZeroconfBrowser(self):
+            logging.debug('Running the zeroconf browser')
             self.browse_sdRef = pybonjour.DNSServiceBrowse(regtype = '_scratch._tcp',
-                                                            callBack = self.bonjourBrowserCallback)
+                                                            callBack = self.zeroconfBrowserCallback)
             try:
                 try:
-                    while self.runBonjour:
+                    while self.runZeroconf:
                         ready = select.select([self.browse_sdRef], [], [], 1) # I hate having to use a timeout here! What a waste of cycles.
                         if self.browse_sdRef in ready[0]:
                             pybonjour.DNSServiceProcessResult(self.browse_sdRef)
                 except (KeyboardInterrupt, SystemExit):
                     pass
             finally:
-                logging.debug('Closing the bonjour browser')
+                logging.debug('Closing the zeroconf browser')
                 self.browse_sdRef.close()
                 
     ###############################################################################################################
@@ -1236,25 +764,19 @@ class UnicornEmu(Gtk.Application):
     ###############################################################################################################
 
     def __init__(self, application_id, flags):
-        global avahi, pybonjour
         # Process command line options
         parser = argparse.ArgumentParser(description='Scratchgpio compatible emulator for Unicorn Hat')
         parser.add_argument('hostname', default='localhost', nargs='?',
                    help='The hostname of the scratch desktop')
         parser.add_argument('-v', '--verbose', nargs='?', const=True, default=False,
                    help='Send debug logging to stderr')
-        group = parser.add_mutually_exclusive_group()
-        group.add_argument('-a', nargs='?', const=True, default=False,
-                   help='Enable avahi support')
-        group.add_argument('--avahi', nargs='?', const=True, default=False,
-                   help='Enable avahi support')
-        group.add_argument('-b', nargs='?', const=True, default=False,
-                   help='Enable bonjour support')
-        group.add_argument('--bonjour', nargs='?', const=True, default=False,
-                   help='Enable bonjour support')
+        parser.add_argument('--no-zeroconf', dest='zeroconf', action='store_false',
+                   help='Disable zeroconf support')
+        parser.set_defaults(zeroconf=True)
 
         args = parser.parse_args()
-        self.hostname = args.hostname            
+        self.hostname = args.hostname
+                
                         
         Gtk.Application.__init__(self, application_id=application_id, flags=flags)
         
@@ -1271,22 +793,15 @@ class UnicornEmu(Gtk.Application):
             formatter = logging.Formatter(logFormat)
             console.setFormatter(formatter)
             logging.getLogger('').addHandler(console)
-            
-        self.avahiSupport = False
-        self.bonjourSupport = False
-        if args.avahi:
+        
+        self.zeroconfSupport = False 
+        if args.zeroconf == True:  
             try:
-                import avahi
-                self.avahiSupport = True
-            except ImportError, error:
-                dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.NONE, "Avahi support not available")
-                dialog.run()
-        elif args.bonjour:
-            try:
+                global pybonjour
                 import pybonjour
-                self.bonjourSupport = True
+                self.zeroconfSupport = True
             except ImportError, error:
-                dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.NONE, "Bonjour support not available")
+                dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.NONE, "Zeroconf support not available")
                 dialog.run()
                              
         logging.debug('Loading resources')

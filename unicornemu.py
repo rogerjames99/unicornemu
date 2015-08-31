@@ -567,7 +567,6 @@ class UnicornEmu(Gtk.Application):
             
             def runPublishHostZeroconf(self):
                 logging.debug('Running the zeroconf publisher')
-                time.sleep(30)
                 self.register_sdRef = pybonjour.DNSServiceRegister(name = '%s Scratch Remote Sensor Server' % self.hostname_for_title,
                                                                     regtype = '_scratch._tcp', port = 42001, callBack = self.zeroconfRegisterCallback)
                 try:
@@ -836,6 +835,7 @@ class UnicornEmu(Gtk.Application):
     # This class has no methods yet
     
 def main():
+    global Application
     # Initialize GTK Application
     Application = UnicornEmu("uk.co.beardandsandals.unicornemu", Gio.ApplicationFlags.FLAGS_NONE)
 

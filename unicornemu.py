@@ -801,7 +801,7 @@ class UnicornEmu(Gtk.Application):
                 import pybonjour
                 self.zeroconfSupport = True
             except ImportError, error:
-                dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.NONE, "Zeroconf support not available")
+                dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.OK, "Zeroconf support not available")
                 dialog.run()
                              
         logging.debug('Loading resources')
@@ -820,7 +820,7 @@ class UnicornEmu(Gtk.Application):
         try:
             Gio.resources_register(resources)
         except AttributeError:
-            dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.OK, "Running on an old version of PyGobject")
+            dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, "Running on an old version of PyGobject")
             dialog.run()
             # Uncomment at your own risk!
             #Gio.Resource._register(resources)

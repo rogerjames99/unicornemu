@@ -815,7 +815,11 @@ class UnicornEmu(Gtk.Application):
             else:
                 resources = Gio.Resource.load(os.path.join('/usr/share/unicornemu', 'unicornemu.gresource'))
         except GLib.Error:
-            resources = Gio.Resource.load(os.path.join(os.getcwd(), 'resources/unicornemu.gresource'))
+            dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.OK, "Running on an old version of PyGobject")
+            dialog.run()
+            # Uncomment at your own risk!
+            #resources = Gio.Resource.load(os.path.join(os.getcwd(), 'resources/unicornemu.gresource'))
+            exit()
             
         try:
             Gio.resources_register(resources)

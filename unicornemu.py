@@ -665,7 +665,7 @@ class UnicornEmu(Gtk.Application):
                 return
 
             if flags & pybonjour.kDNSServiceFlagsAdd:
-                logging.debug("Service added serviceName '%s' regtype '%s' replyDomain '%s'", serviceName, regtype, replyDomain)
+                logging.debug("Service '%s' added - regtype '%s' replyDomain '%s'", serviceName, regtype, replyDomain)
                 self.zeroconfResolved = []
 
                 if (replyDomain, serviceName) in self.zeroconfToThumbnailMap:
@@ -695,19 +695,20 @@ class UnicornEmu(Gtk.Application):
                 finally:
                     resolve_sdRef.close()
                     
-            elif flags & pybonjour.kDNSServiceFlagsRemove:
+            else:
+                logging.debug("Service '%s' removed - replyDomain '%s'", serviceName, replyDomain)
                 if (replyDomain, serviceName) in self.zeroconfToThumbnailMap:
                     logging.debug("Destroy thumbnail")
-                    self.destroy_thumbnail(domain, name)
+                    self.destroy_thumbnail(replyDomain, serviceName)
                 else:
-                    logging.debug("domain '%s' name '%s' not in my cache", domain, name)
+                    logging.debug("domain '%s' name '%s' not in my cache", serviceName, replyDomain)
             
         def zeroconfResolverCallback(self, sdRef, flags, interfaceIndex, errorCode, fullname,
                              hosttarget, port, txtRecord):
             if errorCode == pybonjour.kDNSServiceErr_NoError:
                 logging.debug("Resolved service: fullname '%s' hosttarget '%s' port %s", fullname, hosttarget, port)
                 self.zeroconfResolved.append(True)
-                if hosttarget.split('.')[0] != self.localHostname: 
+                if hosttarget.split('.')[0].lower() != self.localHostname.lower(): # Case insensitive comparison 
                     logging.debug("Creating thumbnail for remote host '%s'", hosttarget)
                     # Need to queue this on the gui thread
                     GLib.idle_add(self.create_new_thumbnail, self.zeroconfReplyDomain, self.zeroconfServiceName, hosttarget, '', port)
@@ -816,7 +817,10 @@ class UnicornEmu(Gtk.Application):
         except GLib.Error:
             resources = Gio.Resource.load(os.path.join(os.getcwd(), 'resources/unicornemu.gresource'))
             
-        Gio.resources_register(resources)
+        try:
+            Gio.resources_register(resources)
+        except AttributeError:
+            Gio.Resource._register(resources)
 
         logging.debug('Resources loaded and registered')
         

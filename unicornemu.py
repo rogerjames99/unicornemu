@@ -153,7 +153,7 @@ class UnicornEmu(Gtk.Application):
                     
                 if not self.socketConnection is None:
                     logging.debug('Connected at first attempt')
-                    self.frame.get_label_widget().set_text('%s (connected)' % self.hostname_for_title)
+                    label.set_text('%s (connected)' % self.hostname_for_title)
                     self.inputStream = self.socketConnection.get_input_stream()
                     self.publishHost()
                     # Start read scratch messages
@@ -162,12 +162,12 @@ class UnicornEmu(Gtk.Application):
                     logging.debug('should not get here 1')
 
             def connect_to_host_async_timer_callback(self, source_object, res, user_data):
+                label = self.frame.get_label_widget()
+                if label is None:
+                    return
                 try:
                     self.socketConnection = self.socketClient.connect_to_host_finish(res)
                 except GLib.GError, error:
-                    label = self.frame.get_label_widget()
-                    if label is None:
-                        return
                     if error.code == Gio.IOErrorEnum.CONNECTION_REFUSED or \
                             error.code == Gio.IOErrorEnum.TIMED_OUT:
                         # Scratch has not responded or has refused the connection
@@ -202,7 +202,7 @@ class UnicornEmu(Gtk.Application):
                 
                 if self.socketConnection:
                     logging.debug('Connected after a retry')
-                    self.frame.get_label_widget().set_text('%s (connected)' % self.hostname_for_title)
+                    label.set_text('%s (connected)' % self.hostname_for_title)
                     self.inputStream = self.socketConnection.get_input_stream()
                     self.publishHost()
                     self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, self.cancellable, self.read_scratch_message_size_callback, None)
@@ -238,7 +238,11 @@ class UnicornEmu(Gtk.Application):
                     # May need to rethink this if I see fragmentation
                     logging.debug('Reconnecting')
                     self.socketConnection.close()
-                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connection lost)' % self.hostname_for_title)
+                    self.frame.get_label_widget().set_text('%s (connection lost)' % self.hostname_for_title)
+                    if self.runPublisher == True:
+                        self.runPublisher = False
+                        self.publisherThread.join()
+
                     self.socketClient = Gio.SocketClient.new()
                     GLib.timeout_add_seconds(30, self.retry_connect_callback)
                     return
@@ -265,7 +269,10 @@ class UnicornEmu(Gtk.Application):
                     # I assume the connection is broken in some way so close it and start again
                     logging.debug('Reconnecting')
                     self.socketConnection.close()
-                    self.window.builder.get_object('unicornemuMainMatrixLabel').set_text('%s (connection lost)' % self.hostname_for_title)
+                    self.frame.get_label_widget().set_text('%s (connection lost)' % self.hostname_for_title)
+                    if self.runPublisher == True:
+                        self.runPublisher = False
+                        self.publisherThread.join()
                     self.socketClient = Gio.SocketClient.new()
                     GLib.timeout_add_seconds(30, self.retry_connect_callback)
                     return

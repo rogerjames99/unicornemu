@@ -118,7 +118,7 @@ class UnicornEmu(Gtk.Application):
                     return
                 try:
                     self.socketConnection = self.socketClient.connect_to_host_finish(res)
-                except GLib.Error, error:
+                except GLib.GError, error:
                     if error.code == Gio.IOErrorEnum.CONNECTION_REFUSED or \
                             error.code == Gio.IOErrorEnum.TIMED_OUT:
                         # Scratch has not responded or has refused the connection
@@ -164,7 +164,7 @@ class UnicornEmu(Gtk.Application):
             def connect_to_host_async_timer_callback(self, source_object, res, user_data):
                 try:
                     self.socketConnection = self.socketClient.connect_to_host_finish(res)
-                except GLib.Error, error:
+                except GLib.GError, error:
                     label = self.frame.get_label_widget()
                     if label is None:
                         return
@@ -227,7 +227,7 @@ class UnicornEmu(Gtk.Application):
                 logging.debug('read_scratch_message_content_callback')
                 try:
                     scratch_message = self.inputStream.read_bytes_finish(res)
-                except GLib.Error, error:
+                except GLib.GError, error:
                         dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
                         dialog.run()
                         self.window.close()
@@ -255,7 +255,7 @@ class UnicornEmu(Gtk.Application):
                 logging.debug('read_scratch_message_size_callback')
                 try:
                     count_bytes = self.inputStream.read_bytes_finish(res)
-                except GLib.Error, error:
+                except GLib.GError, error:
                         dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
                         dialog.run()
                         self.window.close()
@@ -814,17 +814,13 @@ class UnicornEmu(Gtk.Application):
                 resources = Gio.Resource.load('unicornemu.gresource')
             else:
                 resources = Gio.Resource.load(os.path.join('/usr/share/unicornemu', 'unicornemu.gresource'))
-        except GLib.Error:
+        except GLib.GError:
             resources = Gio.Resource.load(os.path.join(os.getcwd(), 'resources/unicornemu.gresource'))            
 
         try:
             Gio.resources_register(resources)
         except AttributeError:
-            dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, "Running on an old version of PyGobject")
-            dialog.run()
-            # Uncomment at your own risk!
-            #Gio.Resource._register(resources)
-            exit()
+            Gio.Resource._register(resources) # Backward compatibility
 
         logging.debug('Resources loaded and registered')
         

@@ -13,7 +13,7 @@ import threading
 
 import time
 
-logFormat = '%(thread)x %(funcName)s %(lineno)d %(levelname)s:%(message)s'
+logFormat = '%(relativeCreated)d %(thread)x %(funcName)s %(lineno)d %(levelname)s:%(message)s'
 #logFormat = '%(funcName)s %(lineno)d %(levelname)s:%(message)s'
 
 def logmatrix(logger, matrix):
@@ -126,7 +126,7 @@ class UnicornEmu(Gtk.Application):
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
                         label.set_text("%s '%s'" % (self.hostname_for_title, error.message))
-                        GLib.timeout_add_seconds(30, self.retry_connect_callback)
+                        self.createTimeout(30, self.retry_connect_callback)
                         return
                     elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND or \
                             error.code == Gio.IOErrorEnum.FAILED: # Gtk seems to return zero for host not found
@@ -134,7 +134,7 @@ class UnicornEmu(Gtk.Application):
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
                         label.set_text("%s '%s'" % (self.hostname_for_title, error.message))
-                        GLib.timeout_add_seconds(30, self.retry_connect_callback)
+                        self.createTimeout(30, self.retry_connect_callback)
                         return
                     elif error.code == Gio.IOErrorEnum.NETWORK_UNREACHABLE or \
                             error.code == Gio.IOErrorEnum.HOST_UNREACHABLE:
@@ -142,7 +142,7 @@ class UnicornEmu(Gtk.Application):
                         logging.debug(error.message)
                         logging.debug('creating timeout %d', error.code)
                         label.set_text('%s (%s)' % (self.hostname_for_title, error.message))
-                        GLib.timeout_add_seconds(30, self.retry_connect_callback)
+                        self.createTimeout(30, self.retry_connect_callback)
                         return
                     else:
                         logging.debug("connect callback code %d domain '%s' message '%s'", error.code, error.domain, error.message)
@@ -175,7 +175,7 @@ class UnicornEmu(Gtk.Application):
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
                         label.set_text('%s (%s)' % (self.hostname_for_title, error.message))
-                        GLib.timeout_add_seconds(30, self.retry_connect_callback)
+                        self.createTimeout(30, self.retry_connect_callback)
                         return
                     elif error.code == Gio.IOErrorEnum.HOST_NOT_FOUND or \
                             error.code == Gio.IOErrorEnum.FAILED: # Gtk seems to return zero for host not found
@@ -183,7 +183,7 @@ class UnicornEmu(Gtk.Application):
                         logging.debug(error.message)
                         logging.debug('Retry connect in 30 seconds')
                         label.set_text('%s (%s)' % (self.hostname_for_title, error.message))
-                        GLib.timeout_add_seconds(30, self.retry_connect_callback)
+                        self.createTimeout(30, self.retry_connect_callback)
                         return
                     elif error.code == Gio.IOErrorEnum.NETWORK_UNREACHABLE or \
                             error.code == Gio.IOErrorEnum.HOST_UNREACHABLE:
@@ -191,7 +191,7 @@ class UnicornEmu(Gtk.Application):
                         logging.debug(error.message)
                         logging.debug('creating timeout %d', error.code)
                         label.set_text('%s (%s)' % (self.hostname_for_title, error.message))
-                        GLib.timeout_add_seconds(30, self.retry_connect_callback)
+                        self.createTimeout(30, self.retry_connect_callback)
                         return
                     else:
                         logging.debug("connect callback code %d domain '%s' message '%s'", error.code, error.domain, error.message)
@@ -228,15 +228,18 @@ class UnicornEmu(Gtk.Application):
                 try:
                     scratch_message = self.inputStream.read_bytes_finish(res)
                 except GLib.GError, error:
-                        dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
+                        dialog = Gtk.MessageDialog(self.frame, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
                         dialog.run()
-                        self.window.close()
+                        #self.window.close()
                         return
+                finally:
+                    logging.debug('Resetting cancellable')
+                    self.cancellable.reset()
                 
                 if scratch_message.get_size() != self.scratch_message_length:
                     # I assume the connection is broken in some way so close it and start again
                     # May need to rethink this if I see fragmentation
-                    logging.debug('Reconnecting')
+                    logging.debug('Read size != message size - Reconnecting')
                     self.socketConnection.close()
                     self.frame.get_label_widget().set_text('%s (connection lost)' % self.hostname_for_title)
                     if self.runPublisher == True:
@@ -244,7 +247,7 @@ class UnicornEmu(Gtk.Application):
                         self.publisherThread.join()
 
                     self.socketClient = Gio.SocketClient.new()
-                    GLib.timeout_add_seconds(30, self.retry_connect_callback)
+                    self.createTimeout(30, self.retry_connect_callback)
                     return
                 
                 logging.debug("Scratch message '%s'", scratch_message.get_data())
@@ -260,21 +263,24 @@ class UnicornEmu(Gtk.Application):
                 try:
                     count_bytes = self.inputStream.read_bytes_finish(res)
                 except GLib.GError, error:
-                        dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
+                        dialog = Gtk.MessageDialog(self.frame, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
                         dialog.run()
-                        self.window.close()
+                        #self.window.close()
                         return
+                finally:
+                    logging.debug('Resetting cancellable')
+                    self.cancellable.reset()
                 
                 if count_bytes.get_size() != 4:
                     # I assume the connection is broken in some way so close it and start again
-                    logging.debug('Reconnecting')
+                    logging.debug('read size != 4 reconnecting')
                     self.socketConnection.close()
                     self.frame.get_label_widget().set_text('%s (connection lost)' % self.hostname_for_title)
                     if self.runPublisher == True:
                         self.runPublisher = False
                         self.publisherThread.join()
                     self.socketClient = Gio.SocketClient.new()
-                    GLib.timeout_add_seconds(30, self.retry_connect_callback)
+                    self.createTimeout(30, self.retry_connect_callback)
                     return
                 
                 self.scratch_message_length = struct.unpack('>L', count_bytes.get_data())[0]
@@ -285,7 +291,7 @@ class UnicornEmu(Gtk.Application):
                 self.inputStream.read_bytes_async(self.scratch_message_length, GLib.PRIORITY_HIGH, None, 
                                                 self.read_scratch_message_content_callback, None)
                                                 
-            def retry_connect_callback(self):
+            def retry_connect_callback(self, userdata):
                 logging.debug('retry connect callback')
                 self.socketClient.connect_to_host_async(self.hostname,
                                                         self.portNumber,
@@ -325,9 +331,15 @@ class UnicornEmu(Gtk.Application):
                 self.update()
                 
             def cleanup(self): # Kill any callbacks
-                logging.debug('Cleaning up cancellable functions')
+                if not self.timeoutSource is None:
+                    logging.debug('Removing timeout from main loop')
+                    self.timeoutSource.destroy()
+                    
                 if not self.cancellable is None:
+                    logging.debug('Cleaning up cancellable functions')
                     self.cancellable.cancel()
+                else:
+                    logging.debug('No cancellable functions')
                 
             def col(self, command):
                 logging.debug('col')
@@ -353,7 +365,13 @@ class UnicornEmu(Gtk.Application):
 
                 if(paintColour[0] >= 0.):
                     self.lastColour = paintColour
-            
+                    
+            def createTimeout(self, interval, callback):
+                logging.debug('Creating new timeout_source')
+                self.timeoutSource = GLib.timeout_source_new_seconds(interval)  
+                self.timeoutSource.set_callback(callback)
+                self.timeoutSource.attach(None)
+                          
             def matrixuse(self):
                 logging.debug('matrixuse')
                 
@@ -625,7 +643,7 @@ class UnicornEmu(Gtk.Application):
                 self.context.rectangle(self.sweepx, self.sweepy, 1, 1)
                 self.context.fill()
                 self.update()
-                GLib.timeout_add(50, self.sweep_timer_callback)
+                self.timeoutId = GLib.timeout_add(50, self.sweep_timer_callback)
             
             def update(self):
                 logging.debug('Dirtying the drawing area')

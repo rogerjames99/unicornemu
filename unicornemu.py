@@ -112,7 +112,7 @@ class UnicornEmu(Gtk.Application):
                     logging.debug("Failed to register service - errorcode %d", errorCode)
         
             def connect_to_host_async_callback(self, source_object, res, user_data):
-                logging.debug( 'async_callback' )
+                logging.debug("async_callback - hostname '%s'", self.hostname)
                 label = self.frame.get_label_widget()
                 if label is None:
                     return
@@ -162,6 +162,7 @@ class UnicornEmu(Gtk.Application):
                     logging.debug('should not get here 1')
 
             def connect_to_host_async_timer_callback(self, source_object, res, user_data):
+                logging.debug("timer_callback - hostname '%s'", self.hostname)
                 label = self.frame.get_label_widget()
                 if label is None:
                     return
@@ -209,7 +210,7 @@ class UnicornEmu(Gtk.Application):
                 else:
                     logging.debug('should not get here 2')
                 
-            def drawMatrix(self, widget, cr):
+            def drawMatrix(self, widget, cr): # linked to draw signal
                 logging.debug('Draw callback')
                 x ,y, width, height = cr.clip_extents()
                 xscale = float(width) / float(self.surface.get_width())
@@ -224,7 +225,7 @@ class UnicornEmu(Gtk.Application):
                 pass
             
             def read_scratch_message_content_callback(self, source_object, res, user_data):
-                logging.debug('read_scratch_message_content_callback')
+                logging.debug("read_scratch_message_content_callback - host '%s'", self.hostname)
                 try:
                     scratch_message = self.inputStream.read_bytes_finish(res)
                 except GLib.GError, error:
@@ -259,7 +260,7 @@ class UnicornEmu(Gtk.Application):
                 self.inputStream.read_bytes_async(4, GLib.PRIORITY_HIGH, None, self.read_scratch_message_size_callback, None)
                 
             def read_scratch_message_size_callback(self, source_object, res, user_data):
-                logging.debug('read_scratch_message_size_callback')
+                logging.debug("read_scratch_message_size_callback - hostname '%s'", self.hostname)
                 try:
                     count_bytes = self.inputStream.read_bytes_finish(res)
                 except GLib.GError, error:

@@ -241,7 +241,7 @@ class UnicornEmu(Gtk.Application):
                     # I assume the connection is broken in some way so close it and start again
                     # May need to rethink this if I see fragmentation
                     logging.debug('Read size != message size - Reconnecting')
-                    self.socketConnection.close()
+                    self.socketConnection.close(None)
                     self.frame.get_label_widget().set_text('%s (connection lost)' % self.hostname_for_title)
                     if self.runPublisher == True:
                         self.runPublisher = False
@@ -275,7 +275,7 @@ class UnicornEmu(Gtk.Application):
                 if count_bytes.get_size() != 4:
                     # I assume the connection is broken in some way so close it and start again
                     logging.debug('read size != 4 reconnecting')
-                    self.socketConnection.close()
+                    self.socketConnection.close(None)
                     self.frame.get_label_widget().set_text('%s (connection lost)' % self.hostname_for_title)
                     if self.runPublisher == True:
                         self.runPublisher = False

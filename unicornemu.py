@@ -231,8 +231,8 @@ class UnicornEmu(Gtk.Application):
                 except GLib.GError, error:
                         dialog = Gtk.MessageDialog(self.frame, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
                         dialog.run()
-                        #self.window.close()
-                        return
+                        dialog.destroy()
+                        Application.quit()
                 finally:
                     logging.debug('Resetting cancellable')
                     self.cancellable.reset()
@@ -266,8 +266,8 @@ class UnicornEmu(Gtk.Application):
                 except GLib.GError, error:
                         dialog = Gtk.MessageDialog(self.frame, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
                         dialog.run()
-                        #self.window.close()
-                        return
+                        dialog.destroy()
+                        Application.quit()
                 finally:
                     logging.debug('Resetting cancellable')
                     self.cancellable.reset()

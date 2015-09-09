@@ -52,6 +52,7 @@ class UnicornEmu(Gtk.Application):
                 self.sweepy = 1
                 self.cancellable = Gio.Cancellable.new()
                 self.runPublisher = False
+                self.timeoutSource = None
 
                 
                 # Use cairo to do the matrix stuff
@@ -465,7 +466,7 @@ class UnicornEmu(Gtk.Application):
                     
                 
                 if len(colour) > 0:
-                    logging.debug('Col %d Row %d Colour %s' % col, row, colour)
+                    logging.debug('Col %d Row %d Colour %s', col, row, colour)
                     paintColour = self.processColour(colour)
                 else:
                     paintColour = self.lastColour
@@ -497,7 +498,7 @@ class UnicornEmu(Gtk.Application):
                         colournumber = -1
                         if colour[0] == '#':
                             colour = colour.replace('#', '0x', 1)
-                        logging.debug('Colour number string %s' % colour)
+                        logging.debug('Colour number string %s', colour)
                         try:
                             colournumber = int(colour, 0)
                         except ValueError:

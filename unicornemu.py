@@ -822,11 +822,11 @@ class UnicornEmu(Gtk.Application):
         
         self.zeroconfSupport = False 
         if args.zeroconf == True:  
-            #try:
-                #global pybonjour
-                #import pybonjour
-                #self.zeroconfSupport = True
-            #except ImportError, error:
+            try:
+                global pybonjour
+                import pybonjour
+                self.zeroconfSupport = True
+            except ImportError, error:
                 dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.OK, "Zeroconf support not available")
                 dialog.run()
                 dialog.destroy()

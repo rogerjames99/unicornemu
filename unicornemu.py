@@ -146,7 +146,7 @@ class UnicornEmu(Gtk.Application):
                         return
                     else:
                         logging.debug("connect callback code %d domain '%s' message '%s'", error.code, error.domain, error.message)
-                        dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
+                        dialog = Gtk.MessageDialog(self.frame.get_toplevel(), Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
                         dialog.run()
                         self.window.close()
                         return
@@ -196,7 +196,7 @@ class UnicornEmu(Gtk.Application):
                         return
                     else:
                         logging.debug("connect callback code %d domain '%s' message '%s'", error.code, error.domain, error.message)
-                        dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
+                        dialog = Gtk.MessageDialog(self.frame.get_toplevel(), Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
                         dialog.run()
                         self.window.close()
                         return
@@ -229,7 +229,7 @@ class UnicornEmu(Gtk.Application):
                 try:
                     scratch_message = self.inputStream.read_bytes_finish(res)
                 except GLib.GError, error:
-                        dialog = Gtk.MessageDialog(self.frame, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
+                        dialog = Gtk.MessageDialog(self.frame.get_toplevel(), Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
                         dialog.run()
                         dialog.destroy()
                         Application.quit()
@@ -264,7 +264,7 @@ class UnicornEmu(Gtk.Application):
                 try:
                     count_bytes = self.inputStream.read_bytes_finish(res)
                 except GLib.GError, error:
-                        dialog = Gtk.MessageDialog(self.frame, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
+                        dialog = Gtk.MessageDialog(self.frame.get_toplevel(), Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
                         dialog.run()
                         dialog.destroy()
                         Application.quit()
@@ -793,7 +793,7 @@ class UnicornEmu(Gtk.Application):
         # Process command line options
         parser = argparse.ArgumentParser(description='Scratchgpio compatible emulator for Unicorn Hat')
         parser.add_argument('hostname', default='localhost', nargs='?',
-                   help='The hostname of the scratch desktop')
+                   help='The hostname of the scratch desktoppi')
         parser.add_argument('-v', '--verbose', nargs='?', const=True, default=False,
                    help='Send debug logging to stderr')
         parser.add_argument('--no-zeroconf', dest='zeroconf', action='store_false',
@@ -822,13 +822,14 @@ class UnicornEmu(Gtk.Application):
         
         self.zeroconfSupport = False 
         if args.zeroconf == True:  
-            try:
-                global pybonjour
-                import pybonjour
-                self.zeroconfSupport = True
-            except ImportError, error:
+            #try:
+                #global pybonjour
+                #import pybonjour
+                #self.zeroconfSupport = True
+            #except ImportError, error:
                 dialog = Gtk.MessageDialog(None, Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.OK, "Zeroconf support not available")
                 dialog.run()
+                dialog.destroy()
                              
         logging.debug('Loading resources')
         

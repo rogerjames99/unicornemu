@@ -74,12 +74,10 @@ class UnicornEmu(Gtk.Application):
                 if hostname == 'localhost':
                     self.hostname_for_title = GLib.get_host_name()
                     self.drawingArea.set_size_request(500, 500)
-                    container.pack_end(self.frame, False, False, 0)
-                    container.set_child_packing(self.frame, True, True, 0, Gtk.PackType.START)
                 else:
                     self.hostname_for_title = hostname
                     self.drawingArea.set_size_request(100, 100)
-                    container.pack_start(self.frame, False, False, 0)
+                container.pack_start(self.frame, True, True, 0)
                 
                 logging.debug('Surface matrix')
                 self.context.scale(float(self.surface.get_width()) / self.hatSize, -float(self.surface.get_height()) / self.hatSize)
@@ -839,11 +837,16 @@ class UnicornEmu(Gtk.Application):
             logging.debug("sys.platform '%s'", sys.platform)
             if sys.platform == 'win32':
                 # Windows look in the current directory
-                resources = Gio.Resource.load('unicornemu.gresource')
+                resource_path = 'unicornemu.gresource'
             else:
-                resources = Gio.Resource.load(os.path.join('/usr/share/unicornemu', 'unicornemu.gresource'))
+                resource_path = os.path.join('/usr/share/unicornemu', 'unicornemu.gresource')
+            logging.debug("Trying '%s'", resource_path)
+            resources = Gio.Resource.load(resource_path)
         except GLib.GError:
-            resources = Gio.Resource.load(os.path.join(os.getcwd(), 'resources/unicornemu.gresource'))            
+            resource_path = 'resources/unicornemu.gresource'
+            logging.debug("Trying '%s'", resource_path)
+            resources = Gio.Resource.load(resource_path)
+
 
         try:
             Gio.resources_register(resources)

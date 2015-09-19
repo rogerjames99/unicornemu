@@ -673,7 +673,7 @@ class UnicornEmu(Gtk.Application):
             if application.zeroconfSupport:
                 # Run the zeroconf service browser
                 # Easiest to use my own thread. I would really like to integrate this better with GOBject.
-                # More research needed on tbis
+                # More research needed on this
                 self.zeroconfBrowserThread = threading.Thread(target = self.runZeroconfBrowser)
                 self.runZeroconf = True
                 self.zeroconfBrowserThread.start()

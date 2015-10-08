@@ -226,12 +226,12 @@ class UnicornEmu(Gtk.Application):
             def read_scratch_message_content_callback(self, source_object, res, user_data):
                 logging.debug("read_scratch_message_content_callback - host '%s'", self.hostname)
                 try:
-                    scratch_message = self.inputStream.read_bytes_finish(res)
-                except GLib.GError, error:
-                        dialog = Gtk.MessageDialog(self.frame.get_toplevel(), Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
-                        dialog.run()
-                        dialog.destroy()
-                        Application.quit()
+                    try:
+                        scratch_message = self.inputStream.read_bytes_finish(res)
+                    except GLib.GError, error:
+                            dialog = Gtk.MessageDialog(self.frame.get_toplevel(), Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
+                            dialog.run()
+                            dialog.destroy()
                 finally:
                     logging.debug('Resetting cancellable')
                     self.cancellable.reset()
@@ -261,12 +261,12 @@ class UnicornEmu(Gtk.Application):
             def read_scratch_message_size_callback(self, source_object, res, user_data):
                 logging.debug("read_scratch_message_size_callback - hostname '%s'", self.hostname)
                 try:
-                    count_bytes = self.inputStream.read_bytes_finish(res)
-                except GLib.GError, error:
-                        dialog = Gtk.MessageDialog(self.frame.get_toplevel(), Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
-                        dialog.run()
-                        dialog.destroy()
-                        Application.quit()
+                    try:
+                        count_bytes = self.inputStream.read_bytes_finish(res)
+                    except GLib.GError, error:
+                            dialog = Gtk.MessageDialog(self.frame.get_toplevel(), Gtk.DialogFlags.MODAL, Gtk.MessageType.WARNING, Gtk.ButtonsType.CLOSE, error.message)
+                            dialog.run()
+                            dialog.destroy()
                 finally:
                     logging.debug('Resetting cancellable')
                     self.cancellable.reset()

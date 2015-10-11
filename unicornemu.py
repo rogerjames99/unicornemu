@@ -836,8 +836,9 @@ class UnicornEmu(Gtk.Application):
         try:
             logging.debug("sys.platform '%s'", sys.platform)
             if sys.platform == 'win32':
-                # Windows look in the current directory
-                resource_path = 'unicornemu.gresource'
+                # Windows look in the script directory
+                # Iffy but should work unless someone has compiled the script and then moved it
+                resource_path = os.path.normpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../unicornemu.gresource'))
             else:
                 resource_path = os.path.join('/usr/share/unicornemu', 'unicornemu.gresource')
             logging.debug("Trying '%s'", resource_path)
